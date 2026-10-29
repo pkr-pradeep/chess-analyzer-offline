@@ -1,0 +1,8 @@
+{
+  "name": "Remix Chess Bot \u0026 Tactical Analyzer",
+  "description": "An offline-capable, privacy-first chess bot with real-time blunder analysis, piece move suggestions, improvement planning, rating tracking, and custom practice puzzles.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
