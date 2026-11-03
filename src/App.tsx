@@ -10,12 +10,11 @@ import { GameReview } from './components/GameAnalysis/GameReview';
 import { PuzzleTrainer } from './components/Puzzles/PuzzleTrainer';
 import { ImprovementPlanner } from './components/ImprovementPlan/ImprovementPlanner';
 import { ProgressDashboard } from './components/Dashboard/ProgressDashboard';
-import { PrivacyModal } from './components/PrivacyModal';
-import { InstallApkModal } from './components/InstallApkModal';
+import { GeminiKeyModal } from './components/GeminiKeyModal';
 import { offlineStorage } from './services/storage';
-import { coachService } from './services/coachService';
+import { geminiKeyService } from './services/geminiKeyService';
 import { GameRecord, RatingPoint, ChessPuzzle, ImprovementPlan, MoveAnalysis } from './types/chess';
-import { BookmarkCheck, Info } from 'lucide-react';
+import { BookmarkCheck } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'play' | 'review' | 'puzzles' | 'plan' | 'dashboard'>('play');
@@ -24,35 +23,9 @@ export default function App() {
   const [puzzles, setPuzzles] = useState<ChessPuzzle[]>([]);
   const [improvementPlan, setImprovementPlan] = useState<ImprovementPlan | null>(null);
   const [selectedReviewGame, setSelectedReviewGame] = useState<GameRecord | null>(null);
-  const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
-  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isGeminiModalOpen, setIsGeminiModalOpen] = useState(false);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  // Capture PWA / WebAPK install prompt
-  useEffect(() => {
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    };
-  }, []);
-
-  const handleTriggerInstall = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const choiceResult = await deferredPrompt.userChoice;
-    if (choiceResult.outcome === 'accepted') {
-      showToast('Installing application to home screen...');
-    }
-    setDeferredPrompt(null);
-  };
 
   // Load from local storage on mount
   useEffect(() => {
@@ -91,7 +64,7 @@ export default function App() {
 
   // Handle Turn Blunder into Custom Practice Puzzle
   const handleSaveBlunderAsPuzzle = (move: MoveAnalysis) => {
-    const puzzle = offlineStorage.addPuzzleFromBlunder(
+    offlineStorage.addPuzzleFromBlunder(
       move.fenBefore,
       move.bestMoveSan || move.san,
       move.bestMove || `${move.from}${move.to}`,
@@ -106,7 +79,7 @@ export default function App() {
   };
 
   // Handle Puzzle Solved
-  const handlePuzzleSolved = (puzzle: ChessPuzzle, success: boolean, ratingChange: number) => {
+  const handlePuzzleSolved = (_puzzle: ChessPuzzle, _success: boolean, ratingChange: number) => {
     const newRating = currentRating + ratingChange;
     offlineStorage.addRatingPoint({
       id: `r-puz-${Date.now()}`,
@@ -168,15 +141,20 @@ export default function App() {
   const handleRegenerateAIPlan = async () => {
     setIsGeneratingAI(true);
     try {
-      // Collect summary of blunders
       let totalBlunders = 0;
       games.forEach(g => {
         totalBlunders += g.playerColor === 'w' ? g.whiteBlunders : g.blackBlunders;
       });
 
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      const storedKey = geminiKeyService.getStoredApiKey();
+      if (storedKey) {
+        headers['x-gemini-key'] = storedKey;
+      }
+
       const res = await fetch('/api/gemini/coach', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           mode: 'improvement_plan',
           gameSummary: {
@@ -222,10 +200,8 @@ export default function App() {
             setActiveTab(tab);
           }
         }}
-        onOpenPrivacy={() => setIsPrivacyModalOpen((prev) => !prev)}
-        onOpenInstallApk={() => setIsInstallModalOpen((prev) => !prev)}
-        isPrivacyOpen={isPrivacyModalOpen}
-        isInstallOpen={isInstallModalOpen}
+        isGeminiModalOpen={isGeminiModalOpen}
+        onToggleGeminiModal={() => setIsGeminiModalOpen((prev) => !prev)}
         rating={currentRating}
       />
 
@@ -297,18 +273,10 @@ export default function App() {
         )}
       </main>
 
-      {/* Privacy Guarantee Modal */}
-      <PrivacyModal
-        isOpen={isPrivacyModalOpen}
-        onClose={() => setIsPrivacyModalOpen(false)}
-      />
-
-      {/* Android Install & APK Modal */}
-      <InstallApkModal
-        isOpen={isInstallModalOpen}
-        onClose={() => setIsInstallModalOpen(false)}
-        deferredPrompt={deferredPrompt}
-        onInstallPrompt={handleTriggerInstall}
+      {/* Gemini AI Key Modal */}
+      <GeminiKeyModal
+        isOpen={isGeminiModalOpen}
+        onClose={() => setIsGeminiModalOpen(false)}
       />
     </div>
   );

@@ -8,19 +8,29 @@ import { Crown, Sparkles } from 'lucide-react';
 const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
 const ranks = ['8', '7', '6', '5', '4', '3', '2', '1'];
 
-// Helper for badge icon
+// Helper for badge icon supporting all 10 Chess.com move categories
 function getClassificationBadge(cls?: MoveClassification) {
   switch (cls) {
     case 'brilliant':
-      return <span className="bg-cyan-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">💎 Brilliant</span>;
+      return <span className="bg-cyan-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">💎 Brilliant (!!)</span>;
+    case 'great':
+      return <span className="bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">🎯 Great (!)</span>;
     case 'best':
       return <span className="bg-emerald-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">⭐ Best</span>;
+    case 'excellent':
+      return <span className="bg-lime-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">👍 Excellent</span>;
+    case 'good':
+      return <span className="bg-slate-700 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">✅ Good</span>;
+    case 'book':
+      return <span className="bg-amber-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">📖 Book</span>;
     case 'inaccuracy':
-      return <span className="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">?! Inaccuracy</span>;
+      return <span className="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">⚠️ Inaccuracy (?!)</span>;
     case 'mistake':
-      return <span className="bg-orange-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">? Mistake</span>;
+      return <span className="bg-orange-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">❓ Mistake (?)</span>;
+    case 'miss':
+      return <span className="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">❌ Miss</span>;
     case 'blunder':
-      return <span className="bg-rose-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">?? Blunder</span>;
+      return <span className="bg-rose-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">🛑 Blunder (??)</span>;
     default:
       return null;
   }

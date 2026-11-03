@@ -12,14 +12,11 @@ import {
   Play, 
   Pause, 
   Sparkles, 
-  Star, 
-  AlertTriangle, 
-  ShieldAlert, 
   BookmarkPlus, 
-  BarChart2, 
-  CheckCircle2,
   TrendingUp,
-  Brain
+  Brain,
+  Filter,
+  CheckCircle2
 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 
@@ -29,14 +26,129 @@ interface GameReviewProps {
   onClose?: () => void;
 }
 
+// Full Chess.com Expected Points Move Categories Metadata
+interface CategoryMeta {
+  id: MoveClassification;
+  symbol: string;
+  name: string;
+  shortDesc: string;
+  badgeClass: string;
+  textClass: string;
+  borderClass: string;
+  dotColor: string;
+}
+
+const MOVE_CATEGORIES: CategoryMeta[] = [
+  {
+    id: 'brilliant',
+    symbol: '!!',
+    name: 'Brilliant',
+    shortDesc: 'A sound, voluntary piece sacrifice that is the optimal or near-optimal move.',
+    badgeClass: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40',
+    textClass: 'text-cyan-400',
+    borderClass: 'border-cyan-500/30',
+    dotColor: '#06b6d4',
+  },
+  {
+    id: 'great',
+    symbol: '!',
+    name: 'Great',
+    shortDesc: 'A critical move that changes the outcome of the game or finds the only saving move.',
+    badgeClass: 'bg-blue-500/20 text-blue-300 border-blue-500/40',
+    textClass: 'text-blue-400',
+    borderClass: 'border-blue-500/30',
+    dotColor: '#3b82f6',
+  },
+  {
+    id: 'best',
+    symbol: '⭐',
+    name: 'Best',
+    shortDesc: 'The optimal move chosen by the chess engine.',
+    badgeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+    textClass: 'text-emerald-400',
+    borderClass: 'border-emerald-500/30',
+    dotColor: '#10b981',
+  },
+  {
+    id: 'excellent',
+    symbol: '👍',
+    name: 'Excellent',
+    shortDesc: 'A near-top choice that results in only a minimal drop in expected points.',
+    badgeClass: 'bg-lime-500/20 text-lime-300 border-lime-500/40',
+    textClass: 'text-lime-400',
+    borderClass: 'border-lime-500/30',
+    dotColor: '#84cc16',
+  },
+  {
+    id: 'good',
+    symbol: '✅',
+    name: 'Good',
+    shortDesc: 'A solid, decent move that keeps the position safe and does not worsen things.',
+    badgeClass: 'bg-slate-700/60 text-slate-200 border-slate-600',
+    textClass: 'text-slate-300',
+    borderClass: 'border-slate-700',
+    dotColor: '#94a3b8',
+  },
+  {
+    id: 'book',
+    symbol: '📖',
+    name: 'Book',
+    shortDesc: 'A standard, well-known opening move derived from chess theory.',
+    badgeClass: 'bg-amber-600/25 text-amber-300 border-amber-600/40',
+    textClass: 'text-amber-400',
+    borderClass: 'border-amber-600/30',
+    dotColor: '#d97706',
+  },
+  {
+    id: 'inaccuracy',
+    symbol: '?!',
+    name: 'Inaccuracy',
+    shortDesc: 'A weak or dubious move that creates minor positional or tactical weaknesses.',
+    badgeClass: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40',
+    textClass: 'text-yellow-400',
+    borderClass: 'border-yellow-500/30',
+    dotColor: '#eab308',
+  },
+  {
+    id: 'mistake',
+    symbol: '?',
+    name: 'Mistake',
+    shortDesc: 'A bad move that noticeably worsens your position or loses a pawn/advantage.',
+    badgeClass: 'bg-orange-500/20 text-orange-300 border-orange-500/40',
+    textClass: 'text-orange-400',
+    borderClass: 'border-orange-500/30',
+    dotColor: '#f97316',
+  },
+  {
+    id: 'miss',
+    symbol: 'X',
+    name: 'Miss',
+    shortDesc: 'Failing to capitalize on an opponent mistake or missing a clear tactical/winning opportunity.',
+    badgeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+    textClass: 'text-rose-400',
+    borderClass: 'border-rose-500/30',
+    dotColor: '#f43f5e',
+  },
+  {
+    id: 'blunder',
+    symbol: '??',
+    name: 'Blunder',
+    shortDesc: 'A severe, game-swinging error that drastically drops your win probability.',
+    badgeClass: 'bg-red-600/25 text-red-300 border-red-500/50',
+    textClass: 'text-red-400',
+    borderClass: 'border-red-500/30',
+    dotColor: '#ef4444',
+  },
+];
+
 export const GameReview: React.FC<GameReviewProps> = ({
   game,
   onSaveBlunderAsPuzzle,
-  onClose,
 }) => {
   const [currentStep, setCurrentStep] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [savedPuzzles, setSavedPuzzles] = useState<Set<number>>(new Set());
+  const [selectedFilterCategory, setSelectedFilterCategory] = useState<MoveClassification | 'all'>('all');
 
   // Reconstruct chess moves reliably from moves or pgn
   const moves: MoveAnalysis[] = useMemo(() => {
@@ -56,7 +168,30 @@ export const GameReview: React.FC<GameReviewProps> = ({
   useEffect(() => {
     setCurrentStep(0);
     setIsPlaying(false);
+    setSelectedFilterCategory('all');
   }, [game.id]);
+
+  // Compute tally of all 10 categories dynamically
+  const categoryCounts = useMemo(() => {
+    const whiteCounts: Record<MoveClassification, number> = {
+      brilliant: 0, great: 0, best: 0, excellent: 0, good: 0, book: 0, inaccuracy: 0, mistake: 0, miss: 0, blunder: 0
+    };
+    const blackCounts: Record<MoveClassification, number> = {
+      brilliant: 0, great: 0, best: 0, excellent: 0, good: 0, book: 0, inaccuracy: 0, mistake: 0, miss: 0, blunder: 0
+    };
+
+    moves.forEach((m) => {
+      const target = m.color === 'w' ? whiteCounts : blackCounts;
+      const cls = m.classification || 'good';
+      if (target[cls] !== undefined) {
+        target[cls]++;
+      } else {
+        target.good++;
+      }
+    });
+
+    return { whiteCounts, blackCounts };
+  }, [moves]);
 
   // Build board position at current step
   const getChessAtStep = (step: number): Chess => {
@@ -64,7 +199,6 @@ export const GameReview: React.FC<GameReviewProps> = ({
     const clampedStep = Math.min(step, moves.length);
     const targetMove = moves[clampedStep - 1];
 
-    // Primary: Instant FEN loading (100% accurate, zero latency)
     if (targetMove?.fenAfter) {
       try {
         return new Chess(targetMove.fenAfter);
@@ -73,7 +207,6 @@ export const GameReview: React.FC<GameReviewProps> = ({
       }
     }
 
-    // Fallback: Replay move by move
     const c = new Chess();
     for (let i = 0; i < clampedStep; i++) {
       const m = moves[i];
@@ -163,52 +296,64 @@ export const GameReview: React.FC<GameReviewProps> = ({
     setSavedPuzzles((prev) => new Set([...prev, idx]));
   };
 
-  const getBadge = (cls?: MoveClassification) => {
+  const getCategoryBadge = (cls?: MoveClassification) => {
+    const meta = MOVE_CATEGORIES.find((c) => c.id === cls) || MOVE_CATEGORIES[4];
+    return (
+      <span className={`${meta.badgeClass} border text-xs px-2.5 py-0.5 rounded-full font-bold inline-flex items-center gap-1 shadow-xs`}>
+        <span>{meta.symbol}</span>
+        <span>{meta.name}</span>
+      </span>
+    );
+  };
+
+  const getMoveSymbol = (cls?: MoveClassification) => {
     switch (cls) {
-      case 'brilliant':
-        return <span className="bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs px-2 py-0.5 rounded-full font-bold">💎 Brilliant</span>;
-      case 'best':
-        return <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs px-2 py-0.5 rounded-full font-bold">⭐ Best</span>;
-      case 'inaccuracy':
-        return <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs px-2 py-0.5 rounded-full font-bold">?! Inaccuracy</span>;
-      case 'mistake':
-        return <span className="bg-orange-500/20 text-orange-300 border border-orange-500/30 text-xs px-2 py-0.5 rounded-full font-bold">? Mistake</span>;
-      case 'blunder':
-        return <span className="bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs px-2 py-0.5 rounded-full font-bold">?? Blunder</span>;
-      default:
-        return <span className="bg-slate-800 text-slate-400 text-xs px-2 py-0.5 rounded-full">Good</span>;
+      case 'brilliant': return <span className="text-cyan-400 font-bold">!!</span>;
+      case 'great': return <span className="text-blue-400 font-bold">!</span>;
+      case 'best': return <span className="text-emerald-400 font-bold">⭐</span>;
+      case 'excellent': return <span className="text-lime-400 font-bold">👍</span>;
+      case 'good': return <span className="text-slate-400 font-bold">✓</span>;
+      case 'book': return <span className="text-amber-400 font-bold">📖</span>;
+      case 'inaccuracy': return <span className="text-yellow-400 font-bold">?!</span>;
+      case 'mistake': return <span className="text-orange-400 font-bold">?</span>;
+      case 'miss': return <span className="text-rose-400 font-bold">✕</span>;
+      case 'blunder': return <span className="text-red-500 font-bold">??</span>;
+      default: return null;
     }
   };
 
   return (
-    <div id="game-review-root" className="space-y-6">
+    <div id="game-review-root" className="space-y-4 sm:space-y-6">
       {/* Top Banner: Accuracy & Match Overview */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs font-semibold px-2.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                Full Game Analysis
+                Chess.com Game Review
               </span>
               <span className="text-xs text-slate-400">{game.date}</span>
               <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">
                 Result: {game.result} ({game.terminationReason})
               </span>
             </div>
-            <h2 className="text-xl font-bold text-slate-100 mt-1">
+            <h2 className="text-lg sm:text-xl font-bold text-slate-100 mt-1">
               {game.whitePlayer} vs {game.blackPlayer}
             </h2>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Move classification powered by the <strong>Expected Points (CAPS2) Model</strong> measuring win probability changes.
+            </p>
           </div>
 
           {/* Dual Accuracy Scores */}
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-6 self-start md:self-auto">
             <div className="text-center">
               <div className="text-xs font-medium text-slate-400 mb-1">White Accuracy</div>
               <div className="text-2xl font-bold font-mono text-slate-100 flex items-center justify-center gap-1">
                 {game.whiteAccuracy}%
               </div>
               <div className="text-[10px] text-slate-500">
-                {game.whiteBlunders} Blunders • {game.whiteMistakes} Mistakes
+                {categoryCounts.whiteCounts.blunder} Blunders • {categoryCounts.whiteCounts.miss} Misses
               </div>
             </div>
 
@@ -220,15 +365,66 @@ export const GameReview: React.FC<GameReviewProps> = ({
                 {game.blackAccuracy}%
               </div>
               <div className="text-[10px] text-slate-500">
-                {game.blackBlunders} Blunders • {game.blackMistakes} Mistakes
+                {categoryCounts.blackCounts.blunder} Blunders • {categoryCounts.blackCounts.miss} Misses
               </div>
             </div>
           </div>
         </div>
 
-        {/* Evaluation Graph */}
+        {/* SECTION: Chess.com 10 Move Categories Breakdown Grid */}
+        <div className="pt-4 pb-2">
+          <div className="flex items-center justify-between mb-2.5">
+            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>Move Categories Breakdown (Best to Worst)</span>
+            </h3>
+            {selectedFilterCategory !== 'all' && (
+              <button
+                onClick={() => setSelectedFilterCategory('all')}
+                className="text-[11px] text-amber-400 hover:text-amber-300 underline cursor-pointer"
+              >
+                Clear filter (Show all moves)
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-1.5 sm:gap-2">
+            {MOVE_CATEGORIES.map((cat) => {
+              const whiteVal = categoryCounts.whiteCounts[cat.id];
+              const blackVal = categoryCounts.blackCounts[cat.id];
+              const isSelected = selectedFilterCategory === cat.id;
+
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setSelectedFilterCategory(isSelected ? 'all' : cat.id)}
+                  className={`p-2 rounded-xl border text-center transition-all cursor-pointer flex flex-col justify-between ${
+                    isSelected
+                      ? 'bg-amber-500/20 border-amber-400 ring-2 ring-amber-400/40 shadow-md'
+                      : 'bg-slate-950/70 border-slate-800 hover:bg-slate-800/80 hover:border-slate-700'
+                  }`}
+                  title={`${cat.name} (${cat.symbol}): ${cat.shortDesc}`}
+                >
+                  <div className="flex items-center justify-center gap-1 mb-1">
+                    <span className="text-xs font-bold font-mono">{cat.symbol}</span>
+                    <span className="text-[11px] font-semibold text-slate-200">{cat.name}</span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px] font-mono px-1 py-0.5 rounded bg-slate-900/90 border border-slate-800/80">
+                    <span className="text-slate-300 font-bold" title="White">{whiteVal}</span>
+                    <span className="text-slate-600">|</span>
+                    <span className="text-slate-400 font-bold" title="Black">{blackVal}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Evaluation Trajectory Graph */}
         {chartData.length > 0 && (
-          <div className="pt-4">
+          <div className="pt-3 border-t border-slate-800/80 mt-2">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
                 <TrendingUp className="w-3.5 h-3.5 text-amber-400" />
@@ -238,7 +434,7 @@ export const GameReview: React.FC<GameReviewProps> = ({
                 White advantage (&gt; 0) vs Black advantage (&lt; 0)
               </span>
             </div>
-            <div className="h-24 w-full">
+            <div className="h-20 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartData} onClick={(e) => {
                   if (e && e.activeTooltipIndex !== undefined) {
@@ -258,7 +454,7 @@ export const GameReview: React.FC<GameReviewProps> = ({
                       if (active && payload && payload.length) {
                         const data = payload[0].payload;
                         return (
-                          <div className="bg-slate-950 border border-slate-700 p-2 rounded text-xs text-slate-200">
+                          <div className="bg-slate-950 border border-slate-700 p-2 rounded text-xs text-slate-200 shadow-xl">
                             <p className="font-bold">{data.san} ({data.classification})</p>
                             <p className="text-slate-400">Eval: {data.eval > 0 ? `+${data.eval}` : data.eval}</p>
                           </div>
@@ -275,8 +471,8 @@ export const GameReview: React.FC<GameReviewProps> = ({
         )}
       </div>
 
-      {/* Main Review Stage: Board + Move Stepper & Analysis */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      {/* Main Review Stage: Board + Move Stepper & Step Analysis */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 items-start">
         {/* Left: Board */}
         <div className="lg:col-span-7 flex flex-col items-center">
           <div className="w-full max-w-[560px] sm:max-w-[620px]">
@@ -294,12 +490,12 @@ export const GameReview: React.FC<GameReviewProps> = ({
             />
 
             {/* Stepper Controls */}
-            <div className="flex items-center justify-center gap-2 mt-4 bg-slate-900 border border-slate-800 p-2 rounded-xl">
+            <div className="flex items-center justify-center gap-2 mt-3 sm:mt-4 bg-slate-900 border border-slate-800 p-2 rounded-xl shadow-md">
               <button
                 id="btn-step-first"
                 onClick={() => handleStepChange(0)}
                 disabled={currentStep === 0}
-                className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-300 transition-colors"
+                className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-300 transition-colors cursor-pointer"
                 title="First move (Home)"
               >
                 <ChevronsLeft className="w-4 h-4" />
@@ -308,7 +504,7 @@ export const GameReview: React.FC<GameReviewProps> = ({
                 id="btn-step-prev"
                 onClick={() => handleStepChange(currentStep - 1)}
                 disabled={currentStep === 0}
-                className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-300 transition-colors"
+                className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-300 transition-colors cursor-pointer"
                 title="Previous move (Left Arrow)"
               >
                 <ChevronLeft className="w-4 h-4" />
@@ -316,7 +512,7 @@ export const GameReview: React.FC<GameReviewProps> = ({
               <button
                 id="btn-step-play"
                 onClick={() => setIsPlaying(!isPlaying)}
-                className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-colors shadow-sm"
+                className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer"
                 title="Toggle Replay / Autoplay (Space)"
               >
                 {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
@@ -326,7 +522,7 @@ export const GameReview: React.FC<GameReviewProps> = ({
                 id="btn-step-next"
                 onClick={() => handleStepChange(currentStep + 1)}
                 disabled={currentStep >= totalSteps}
-                className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-300 transition-colors"
+                className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-300 transition-colors cursor-pointer"
                 title="Next move (Right Arrow)"
               >
                 <ChevronRight className="w-4 h-4" />
@@ -335,7 +531,7 @@ export const GameReview: React.FC<GameReviewProps> = ({
                 id="btn-step-last"
                 onClick={() => handleStepChange(totalSteps)}
                 disabled={currentStep >= totalSteps}
-                className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-300 transition-colors"
+                className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-300 transition-colors cursor-pointer"
                 title="Final position (End)"
               >
                 <ChevronsRight className="w-4 h-4" />
@@ -357,40 +553,65 @@ export const GameReview: React.FC<GameReviewProps> = ({
                   <span className="text-lg font-bold font-mono text-slate-100">
                     {Math.ceil(currentStep / 2)}. {currentMoveAnalysis.san}
                   </span>
-                  {getBadge(currentMoveAnalysis.classification)}
+                  {getCategoryBadge(currentMoveAnalysis.classification)}
                 </div>
-                <span className="text-xs font-mono text-slate-400">
-                  Eval: {(currentMoveAnalysis.evalAfter / 100).toFixed(1)}
-                </span>
+
+                <div className="flex items-center gap-2 text-right">
+                  {currentMoveAnalysis.winProbabilityAfter !== undefined && (
+                    <span className="text-xs font-mono font-semibold text-amber-400" title="Expected Points / Win Probability">
+                      Win: {currentMoveAnalysis.winProbabilityAfter}%
+                    </span>
+                  )}
+                  <span className="text-xs font-mono text-slate-400">
+                    ({(currentMoveAnalysis.evalAfter / 100).toFixed(1)})
+                  </span>
+                </div>
               </div>
 
-              <p className="text-xs text-slate-300 leading-relaxed">
-                {currentMoveAnalysis.explanation}
-              </p>
+              {/* Category Explanation Banner */}
+              <div className="p-2.5 rounded-lg bg-slate-950/70 border border-slate-800 text-xs">
+                <p className="text-slate-200 font-medium leading-relaxed">
+                  {currentMoveAnalysis.explanation}
+                </p>
+                {currentMoveAnalysis.expectedPointsDrop !== undefined && currentMoveAnalysis.expectedPointsDrop > 0 && (
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Expected Points Drop: <strong className="text-rose-400">-{currentMoveAnalysis.expectedPointsDrop}%</strong> win probability.
+                  </p>
+                )}
+              </div>
 
               {/* Tactical alternative */}
               {currentMoveAnalysis.bestMoveSan && currentMoveAnalysis.bestMoveSan !== currentMoveAnalysis.san && (
                 <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-xs flex items-center justify-between">
                   <span className="text-slate-400">
-                    Grandmaster Choice: <strong className="text-emerald-400 font-mono text-sm">{currentMoveAnalysis.bestMoveSan}</strong>
+                    Grandmaster Best Move: <strong className="text-emerald-400 font-mono text-sm">{currentMoveAnalysis.bestMoveSan}</strong>
                   </span>
                 </div>
               )}
 
-              {/* Save Blunder Button */}
-              {(currentMoveAnalysis.classification === 'blunder' || currentMoveAnalysis.classification === 'mistake') && (
+              {/* Save Blunder / Miss as Custom Puzzle */}
+              {(currentMoveAnalysis.classification === 'blunder' || currentMoveAnalysis.classification === 'mistake' || currentMoveAnalysis.classification === 'miss') && (
                 <div className="pt-2 border-t border-slate-800 flex justify-end">
                   <button
                     onClick={() => handleSavePuzzle(currentStep - 1, currentMoveAnalysis)}
                     disabled={savedPuzzles.has(currentStep - 1)}
-                    className={`text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-medium transition-all ${
+                    className={`text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-medium transition-all cursor-pointer ${
                       savedPuzzles.has(currentStep - 1)
                         ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
                         : 'bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40'
                     }`}
                   >
-                    <BookmarkPlus className="w-3.5 h-3.5" />
-                    {savedPuzzles.has(currentStep - 1) ? 'Saved to Practice Puzzles' : 'Save Blunder as Custom Puzzle'}
+                    {savedPuzzles.has(currentStep - 1) ? (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Saved to Practice Puzzles</span>
+                      </>
+                    ) : (
+                      <>
+                        <BookmarkPlus className="w-3.5 h-3.5" />
+                        <span>Turn {currentMoveAnalysis.classification.toUpperCase()} into Practice Puzzle</span>
+                      </>
+                    )}
                   </button>
                 </div>
               )}
@@ -403,16 +624,30 @@ export const GameReview: React.FC<GameReviewProps> = ({
           )}
 
           {/* Move List Table */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-lg max-h-[360px] overflow-y-auto">
-            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-1">
-              Game Notation & Blunder Marks
-            </h4>
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-lg max-h-[340px] overflow-y-auto">
+            <div className="flex items-center justify-between mb-2 px-1">
+              <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                Game Notation & Move Badges
+              </h4>
+              {selectedFilterCategory !== 'all' && (
+                <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 font-semibold flex items-center gap-1">
+                  <Filter className="w-2.5 h-2.5" />
+                  Filtering: {selectedFilterCategory}
+                </span>
+              )}
+            </div>
+
             <div className="space-y-1">
               {Array.from({ length: Math.ceil(moves.length / 2) }).map((_, moveIndex) => {
                 const whiteMove = moves[moveIndex * 2];
                 const blackMove = moves[moveIndex * 2 + 1];
                 const whiteStepNum = moveIndex * 2 + 1;
                 const blackStepNum = moveIndex * 2 + 2;
+
+                const whiteMatchesFilter = selectedFilterCategory === 'all' || whiteMove?.classification === selectedFilterCategory;
+                const blackMatchesFilter = selectedFilterCategory === 'all' || blackMove?.classification === selectedFilterCategory;
+
+                if (!whiteMatchesFilter && !blackMatchesFilter) return null;
 
                 return (
                   <div key={moveIndex} className="grid grid-cols-12 gap-2 text-xs py-1 px-1.5 rounded hover:bg-slate-800/40 items-center font-mono">
@@ -421,30 +656,32 @@ export const GameReview: React.FC<GameReviewProps> = ({
                     {/* White move */}
                     <button
                       onClick={() => handleStepChange(whiteStepNum)}
-                      className={`col-span-5 text-left px-2 py-1 rounded flex items-center justify-between transition-colors ${
-                        currentStep === whiteStepNum ? 'bg-amber-500/20 text-amber-300 font-bold' : 'text-slate-200'
+                      className={`col-span-5 text-left px-2 py-1 rounded flex items-center justify-between transition-colors cursor-pointer ${
+                        currentStep === whiteStepNum
+                          ? 'bg-amber-500/20 text-amber-300 font-bold ring-1 ring-amber-500/40'
+                          : whiteMatchesFilter ? 'text-slate-200' : 'text-slate-500 opacity-40'
                       }`}
                     >
                       <span>{whiteMove.san}</span>
-                      {whiteMove.classification === 'blunder' && <span className="text-[10px] text-rose-400 font-bold">??</span>}
-                      {whiteMove.classification === 'mistake' && <span className="text-[10px] text-orange-400 font-bold">?</span>}
-                      {whiteMove.classification === 'inaccuracy' && <span className="text-[10px] text-amber-400 font-bold">?!</span>}
-                      {whiteMove.classification === 'best' && <span className="text-[10px] text-emerald-400 font-bold">★</span>}
+                      <span className="text-[10px] font-bold">
+                        {getMoveSymbol(whiteMove.classification)}
+                      </span>
                     </button>
 
                     {/* Black move */}
                     {blackMove ? (
                       <button
                         onClick={() => handleStepChange(blackStepNum)}
-                        className={`col-span-5 text-left px-2 py-1 rounded flex items-center justify-between transition-colors ${
-                          currentStep === blackStepNum ? 'bg-amber-500/20 text-amber-300 font-bold' : 'text-slate-200'
+                        className={`col-span-5 text-left px-2 py-1 rounded flex items-center justify-between transition-colors cursor-pointer ${
+                          currentStep === blackStepNum
+                            ? 'bg-amber-500/20 text-amber-300 font-bold ring-1 ring-amber-500/40'
+                            : blackMatchesFilter ? 'text-slate-200' : 'text-slate-500 opacity-40'
                         }`}
                       >
                         <span>{blackMove.san}</span>
-                        {blackMove.classification === 'blunder' && <span className="text-[10px] text-rose-400 font-bold">??</span>}
-                        {blackMove.classification === 'mistake' && <span className="text-[10px] text-orange-400 font-bold">?</span>}
-                        {blackMove.classification === 'inaccuracy' && <span className="text-[10px] text-amber-400 font-bold">?!</span>}
-                        {blackMove.classification === 'best' && <span className="text-[10px] text-emerald-400 font-bold">★</span>}
+                        <span className="text-[10px] font-bold">
+                          {getMoveSymbol(blackMove.classification)}
+                        </span>
                       </button>
                     ) : (
                       <div className="col-span-5" />

@@ -2,13 +2,15 @@ export type PieceColor = 'w' | 'b';
 
 export type MoveClassification = 
   | 'brilliant' 
+  | 'great'
   | 'best' 
   | 'excellent' 
   | 'good' 
+  | 'book'
   | 'inaccuracy' 
   | 'mistake' 
-  | 'blunder' 
-  | 'book';
+  | 'miss'
+  | 'blunder';
 
 export interface MoveAnalysis {
   san: string;
@@ -26,6 +28,22 @@ export interface MoveAnalysis {
   explanation: string;
   tacticalMotive?: string;
   timeSpentSeconds?: number; // Time spent by player on this move
+  winProbabilityBefore?: number; // 0..100% (Expected Points model)
+  winProbabilityAfter?: number; // 0..100%
+  expectedPointsDrop?: number; // 0..100%
+}
+
+export interface MoveCategoryStats {
+  brilliant: number;
+  great: number;
+  best: number;
+  excellent: number;
+  good: number;
+  book: number;
+  inaccuracy: number;
+  mistake: number;
+  miss: number;
+  blunder: number;
 }
 
 export interface GameRecord {
@@ -41,12 +59,27 @@ export interface GameRecord {
   moves: MoveAnalysis[];
   whiteAccuracy: number;
   blackAccuracy: number;
-  whiteBlunders: number;
-  blackBlunders: number;
-  whiteMistakes: number;
-  blackMistakes: number;
+  // Chess.com Expected Points Move Categories Count
+  whiteBrilliants?: number;
+  blackBrilliants?: number;
+  whiteGreats?: number;
+  blackGreats?: number;
+  whiteBests?: number;
+  blackBests?: number;
+  whiteExcellents?: number;
+  blackExcellents?: number;
+  whiteGoods?: number;
+  blackGoods?: number;
+  whiteBooks?: number;
+  blackBooks?: number;
   whiteInaccuracies: number;
   blackInaccuracies: number;
+  whiteMistakes: number;
+  blackMistakes: number;
+  whiteMisses?: number;
+  blackMisses?: number;
+  whiteBlunders: number;
+  blackBlunders: number;
   ratingBefore: number;
   ratingAfter: number;
   timeControl?: string;

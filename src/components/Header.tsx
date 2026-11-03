@@ -8,52 +8,38 @@ import {
   BarChart3, 
   Volume2, 
   VolumeX, 
-  ShieldCheck, 
-  Wifi, 
-  WifiOff,
-  Smartphone,
-  ChevronDown,
-  ChevronUp,
+  ChevronDown, 
+  ChevronUp, 
   Sparkles,
-  PlayCircle,
-  TrendingUp
+  Key
 } from 'lucide-react';
 import { chessAudio } from '../utils/chessAudio';
+import { geminiKeyService } from '../services/geminiKeyService';
 
 interface HeaderProps {
   activeTab: 'play' | 'review' | 'puzzles' | 'plan' | 'dashboard';
   onSelectTab: (tab: 'play' | 'review' | 'puzzles' | 'plan' | 'dashboard') => void;
-  onOpenPrivacy: () => void;
-  onOpenInstallApk?: () => void;
-  isPrivacyOpen?: boolean;
-  isInstallOpen?: boolean;
+  isGeminiModalOpen: boolean;
+  onToggleGeminiModal: () => void;
   rating: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   activeTab,
   onSelectTab,
-  onOpenPrivacy,
-  onOpenInstallApk,
-  isPrivacyOpen = false,
-  isInstallOpen = false,
+  isGeminiModalOpen,
+  onToggleGeminiModal,
   rating,
 }) => {
   const [isMuted, setIsMuted] = useState(!chessAudio.isSoundEnabled());
-  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
-  const [isRibbonExpanded, setIsRibbonExpanded] = useState<boolean>(false); // Office-style ribbon expansion toggle
+  const [isRibbonExpanded, setIsRibbonExpanded] = useState<boolean>(false);
+  const [hasApiKey, setHasApiKey] = useState(geminiKeyService.hasApiKey());
 
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
+    const unsubscribe = geminiKeyService.subscribe((key) => {
+      setHasApiKey(Boolean(key && key.length > 5));
+    });
+    return unsubscribe;
   }, []);
 
   const toggleSound = () => {
@@ -106,17 +92,18 @@ export const Header: React.FC<HeaderProps> = ({
   ];
 
   return (
-    <header className="shrink-0 z-40 bg-slate-950/95 backdrop-blur-md border-b border-slate-800/80 px-2.5 sm:px-6 py-1 sm:py-1.5 relative">
-      <div className="max-w-7xl mx-auto flex items-center justify-between gap-1.5 sm:gap-4">
+    <header className="shrink-0 z-40 bg-slate-950/95 backdrop-blur-md border-b border-slate-800/80 px-1.5 sm:px-4 md:px-6 py-1 sm:py-1.5 relative w-full overflow-hidden">
+      <div className="max-w-7xl mx-auto flex items-center justify-between gap-1 sm:gap-3">
         {/* Brand / Logo */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shadow-inner">
-            <Crown className="w-4 h-4" />
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+          <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shadow-inner shrink-0">
+            <Crown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </div>
           <div>
             <h1 className="text-xs sm:text-sm font-bold tracking-tight text-slate-100 flex items-center gap-1">
-              <span>Chess Bot</span>
-              <span className="text-[9px] uppercase font-bold tracking-wider px-1 py-0.2 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">
+              <span className="hidden xs:inline">Chess Bot</span>
+              <span className="xs:hidden">Chess</span>
+              <span className="hidden sm:inline-block text-[9px] uppercase font-bold tracking-wider px-1 py-0.2 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">
                 GM
               </span>
             </h1>
@@ -126,8 +113,8 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Microsoft Office Style Static Horizontal Icon Bar (No Scrolling!) */}
-        <div className="flex items-center bg-slate-900/90 border border-slate-800 rounded-lg p-0.5 sm:p-1 shadow-inner">
+        {/* Microsoft Office Style Static Horizontal Icon Bar (Zero scroll, static icons with expander) */}
+        <div className="flex items-center bg-slate-900/90 border border-slate-800 rounded-lg p-0.5 sm:p-1 shadow-inner shrink-0">
           <nav className="flex items-center gap-0.5 sm:gap-1" aria-label="Main Navigation">
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -142,7 +129,7 @@ export const Header: React.FC<HeaderProps> = ({
                     }
                     onSelectTab(item.id);
                   }}
-                  className={`px-2 py-1 sm:px-2.5 sm:py-1 rounded-md sm:rounded-lg font-medium flex items-center gap-1.5 transition-all text-[11px] sm:text-xs cursor-pointer select-none relative group ${
+                  className={`p-1 sm:px-2.5 sm:py-1 rounded-md sm:rounded-lg font-medium flex items-center gap-1.5 transition-all text-[11px] sm:text-xs cursor-pointer select-none relative group ${
                     isActive
                       ? 'bg-amber-500 text-slate-950 font-bold shadow-xs'
                       : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
@@ -167,12 +154,12 @@ export const Header: React.FC<HeaderProps> = ({
           </nav>
 
           {/* Microsoft Office Ribbon Expand / Collapse Toggle Button */}
-          <div className="h-4 w-px bg-slate-800 mx-1 hidden xs:block" />
+          <div className="h-3.5 w-px bg-slate-800 mx-0.5 hidden xs:block" />
           <button
             id="btn-toggle-ribbon"
             type="button"
             onClick={() => setIsRibbonExpanded(!isRibbonExpanded)}
-            className={`p-1 sm:p-1.5 rounded-md transition-all cursor-pointer flex items-center gap-0.5 text-[10px] font-semibold ${
+            className={`p-1 sm:p-1.5 rounded-md transition-all cursor-pointer items-center gap-0.5 text-[10px] font-semibold hidden xs:flex ${
               isRibbonExpanded
                 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
@@ -190,57 +177,55 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         </div>
 
-        {/* Desktop & Mobile Utility Controls */}
-        <div className="flex items-center gap-1 sm:gap-2 text-xs shrink-0">
-          {/* Online/Offline Badge */}
-          <div 
-            className={`hidden md:flex px-2 py-0.5 rounded-full border items-center gap-1 text-[10px] font-medium ${
-              isOnline
-                ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-400'
-                : 'bg-amber-950/40 border-amber-500/30 text-amber-400'
+        {/* Right Utility Controls: Interactive AI Button & Sound */}
+        <div className="flex items-center gap-1 sm:gap-1.5 text-xs shrink-0">
+          {/* Interactive AI Option Button (Clicking toggles the Gemini Key Modal, clicking again closes it) */}
+          <button
+            id="btn-header-ai-coach"
+            type="button"
+            onClick={onToggleGeminiModal}
+            className={`px-1.5 py-1 sm:px-2.5 sm:py-1 rounded-lg border font-semibold transition-all flex items-center gap-1 sm:gap-1.5 cursor-pointer text-xs select-none shrink-0 ${
+              isGeminiModalOpen
+                ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md ring-2 ring-amber-400/40'
+                : hasApiKey
+                ? 'bg-emerald-950/50 hover:bg-emerald-950/80 border-emerald-500/40 text-emerald-300 hover:border-emerald-400'
+                : 'bg-slate-900 hover:bg-slate-800 border-slate-700/80 text-amber-400 hover:border-amber-500/50'
             }`}
-            title={isOnline ? 'Online: Hybrid AI active' : 'Offline: Local Engine active'}
+            title={
+              isGeminiModalOpen
+                ? 'Close Gemini AI Settings'
+                : hasApiKey
+                ? 'Gemini AI Active: Click to manage key or settings'
+                : 'Configure Gemini API Key for Online Grandmaster Analysis'
+            }
           >
-            {isOnline ? <Wifi className="w-2.5 h-2.5" /> : <WifiOff className="w-2.5 h-2.5" />}
-            <span>{isOnline ? 'AI' : 'Offline'}</span>
-          </div>
+            {hasApiKey ? (
+              <Sparkles className={`w-3.5 h-3.5 shrink-0 ${isGeminiModalOpen ? 'text-slate-950' : 'text-emerald-400 animate-pulse'}`} />
+            ) : (
+              <Key className={`w-3.5 h-3.5 shrink-0 ${isGeminiModalOpen ? 'text-slate-950' : 'text-amber-400'}`} />
+            )}
+            <span className="font-semibold text-[10px] sm:text-xs">
+              AI
+            </span>
+            <span className="hidden sm:inline font-medium text-[11px] sm:text-xs">
+              {hasApiKey ? 'Active' : 'Setup'}
+            </span>
+            <span
+              className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                hasApiKey
+                  ? 'bg-emerald-400 shadow-[0_0_6px_#34d399]'
+                  : 'bg-amber-400/80'
+              }`}
+            />
+          </button>
 
           {/* Sound Toggle */}
           <button
             onClick={toggleSound}
-            className="p-1 sm:p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+            className="p-1 sm:p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer shrink-0"
             title={isMuted ? 'Unmute chess sounds' : 'Mute chess sounds'}
           >
             {isMuted ? <VolumeX className="w-3.5 h-3.5 text-slate-500" /> : <Volume2 className="w-3.5 h-3.5 text-amber-400" />}
-          </button>
-
-          {/* Install / APK Button (Clicking same icon closes window) */}
-          <button
-            id="btn-header-install-apk"
-            onClick={onOpenInstallApk}
-            className={`p-1 sm:px-2.5 sm:py-1 rounded-lg border font-semibold transition-colors flex items-center gap-1 cursor-pointer ${
-              isInstallOpen
-                ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm'
-                : 'bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/40 text-amber-300'
-            }`}
-            title={isInstallOpen ? 'Close APK Window' : 'Download APK or Install on Android'}
-          >
-            <Smartphone className={`w-3.5 h-3.5 ${isInstallOpen ? 'text-slate-950' : 'text-amber-400'}`} />
-            <span className="hidden sm:inline text-[11px]">{isInstallOpen ? 'Close' : 'APK'}</span>
-          </button>
-
-          {/* Privacy Button (Clicking same icon closes window) */}
-          <button
-            onClick={onOpenPrivacy}
-            className={`p-1 sm:px-2 sm:py-1 rounded-lg border transition-colors flex items-center gap-1 font-medium cursor-pointer ${
-              isPrivacyOpen
-                ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-sm'
-                : 'bg-emerald-950/40 hover:bg-emerald-950/60 border-emerald-500/30 text-emerald-400 hover:text-emerald-300'
-            }`}
-            title={isPrivacyOpen ? 'Close Privacy Window' : 'View Data Privacy Guarantee'}
-          >
-            <ShieldCheck className={`w-3.5 h-3.5 ${isPrivacyOpen ? 'text-slate-950' : ''}`} />
-            <span className="hidden lg:inline text-[11px]">{isPrivacyOpen ? 'Close' : 'Privacy'}</span>
           </button>
         </div>
       </div>

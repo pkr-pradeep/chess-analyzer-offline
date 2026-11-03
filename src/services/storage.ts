@@ -1,5 +1,6 @@
 import { Chess } from 'chess.js';
 import { GameRecord, RatingPoint, ChessPuzzle, ImprovementPlan, MoveAnalysis } from '../types/chess';
+import { chessEngine } from './chessEngine';
 
 export function parsePgnToMoves(pgn: string): MoveAnalysis[] {
   if (!pgn) return [];
@@ -8,24 +9,17 @@ export function parsePgnToMoves(pgn: string): MoveAnalysis[] {
     c.loadPgn(pgn);
     const history = c.history({ verbose: true });
     const stepper = new Chess();
-    return history.map((m) => {
+    const resultMoves: MoveAnalysis[] = [];
+    
+    for (let i = 0; i < history.length; i++) {
+      const m = history[i];
       const fenBefore = stepper.fen();
+      const prevAnalysis = resultMoves[i - 1];
+      const analysis = chessEngine.analyzeMove(fenBefore, m.san, m.from, m.to, m.color, i, prevAnalysis);
       stepper.move(m);
-      const fenAfter = stepper.fen();
-      return {
-        san: m.san,
-        from: m.from,
-        to: m.to,
-        color: m.color,
-        fenBefore,
-        fenAfter,
-        evalBefore: 0,
-        evalAfter: 0,
-        evalDelta: 0,
-        classification: 'good',
-        explanation: '',
-      };
-    });
+      resultMoves.push(analysis);
+    }
+    return resultMoves;
   } catch (err) {
     console.warn('Failed to parse PGN to moves:', err);
     return [];

@@ -438,19 +438,67 @@ export const PlayMatch: React.FC<PlayMatchProps> = ({
       ratingDelta = selectedBot.id === 'novice' ? -15 : -8;
     }
 
-    const whiteAccuracy = chessEngine.calculateAccuracy(finalMoves, 'w');
-    const blackAccuracy = chessEngine.calculateAccuracy(finalMoves, 'b');
+    // Ensure all moves have full Expected Points analysis for game review
+    const analyzedMoves: MoveAnalysis[] = finalMoves.map((m, idx) => {
+      if (m.expectedPointsDrop !== undefined && m.classification !== undefined && m.explanation) {
+        return m;
+      }
+      const prevAnalysis = idx > 0 ? finalMoves[idx - 1] : undefined;
+      const computed = chessEngine.analyzeMove(m.fenBefore, m.san, m.from, m.to, m.color, idx, prevAnalysis);
+      return {
+        ...computed,
+        timeSpentSeconds: m.timeSpentSeconds,
+      };
+    });
 
-    let whiteB = 0, blackB = 0, whiteM = 0, blackM = 0, whiteI = 0, blackI = 0;
-    finalMoves.forEach((m) => {
-      if (m.color === 'w') {
-        if (m.classification === 'blunder') whiteB++;
-        else if (m.classification === 'mistake') whiteM++;
-        else if (m.classification === 'inaccuracy') whiteI++;
-      } else {
-        if (m.classification === 'blunder') blackB++;
-        else if (m.classification === 'mistake') blackM++;
-        else if (m.classification === 'inaccuracy') blackI++;
+    const whiteAccuracy = chessEngine.calculateAccuracy(analyzedMoves, 'w');
+    const blackAccuracy = chessEngine.calculateAccuracy(analyzedMoves, 'b');
+
+    // Tally full 10 Chess.com Move Categories
+    let whiteBrilliants = 0, blackBrilliants = 0;
+    let whiteGreats = 0, blackGreats = 0;
+    let whiteBests = 0, blackBests = 0;
+    let whiteExcellents = 0, blackExcellents = 0;
+    let whiteGoods = 0, blackGoods = 0;
+    let whiteBooks = 0, blackBooks = 0;
+    let whiteInaccuracies = 0, blackInaccuracies = 0;
+    let whiteMistakes = 0, blackMistakes = 0;
+    let whiteMisses = 0, blackMisses = 0;
+    let whiteBlunders = 0, blackBlunders = 0;
+
+    analyzedMoves.forEach((m) => {
+      const isWhite = m.color === 'w';
+      switch (m.classification) {
+        case 'brilliant':
+          if (isWhite) whiteBrilliants++; else blackBrilliants++;
+          break;
+        case 'great':
+          if (isWhite) whiteGreats++; else blackGreats++;
+          break;
+        case 'best':
+          if (isWhite) whiteBests++; else blackBests++;
+          break;
+        case 'excellent':
+          if (isWhite) whiteExcellents++; else blackExcellents++;
+          break;
+        case 'good':
+          if (isWhite) whiteGoods++; else blackGoods++;
+          break;
+        case 'book':
+          if (isWhite) whiteBooks++; else blackBooks++;
+          break;
+        case 'inaccuracy':
+          if (isWhite) whiteInaccuracies++; else blackInaccuracies++;
+          break;
+        case 'mistake':
+          if (isWhite) whiteMistakes++; else blackMistakes++;
+          break;
+        case 'miss':
+          if (isWhite) whiteMisses++; else blackMisses++;
+          break;
+        case 'blunder':
+          if (isWhite) whiteBlunders++; else blackBlunders++;
+          break;
       }
     });
 
@@ -469,15 +517,29 @@ export const PlayMatch: React.FC<PlayMatchProps> = ({
       result: result as any,
       terminationReason: reason,
       pgn: chess.pgn(),
-      moves: finalMoves,
+      moves: analyzedMoves,
       whiteAccuracy,
       blackAccuracy,
-      whiteBlunders: whiteB,
-      blackBlunders: blackB,
-      whiteMistakes: whiteM,
-      blackMistakes: blackM,
-      whiteInaccuracies: whiteI,
-      blackInaccuracies: blackI,
+      whiteBrilliants,
+      blackBrilliants,
+      whiteGreats,
+      blackGreats,
+      whiteBests,
+      blackBests,
+      whiteExcellents,
+      blackExcellents,
+      whiteGoods,
+      blackGoods,
+      whiteBooks,
+      blackBooks,
+      whiteInaccuracies,
+      blackInaccuracies,
+      whiteMistakes,
+      blackMistakes,
+      whiteMisses,
+      blackMisses,
+      whiteBlunders,
+      blackBlunders,
       ratingBefore: userRating,
       ratingAfter: userRating + ratingDelta,
       avgPlayerMoveTime: avgMoveSec,

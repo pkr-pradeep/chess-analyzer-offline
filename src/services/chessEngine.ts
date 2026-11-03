@@ -79,19 +79,36 @@ const KING_MID_PST = [
   20, 30, 10,  0,  0, 10, 30, 20
 ];
 
-// Helper to calculate board position index 0..63
-function squareToIndex(square: Square): number {
-  const file = square.charCodeAt(0) - 97; // a-h -> 0-7
-  const rank = 8 - parseInt(square[1], 10); // 8-1 -> 0-7
-  return rank * 8 + file;
-}
-
 export interface TacticalThreat {
   square: Square;
   pieceType: string;
   color: PieceColor;
   threatType: 'hanging' | 'under_attack' | 'pinned' | 'forked' | 'open_file' | 'check';
   description: string;
+}
+
+// Standard Opening Book Lines
+const OPENING_BOOK_SAN = new Set([
+  // 1st moves
+  'e4', 'd4', 'c4', 'Nf3', 'g3', 'f4', 'b3', 'Nc3',
+  'e5', 'c5', 'e6', 'c6', 'd5', 'Nf6', 'g6', 'd6', 'b6',
+  // 2nd moves
+  'Nf3', 'Nc3', 'Bc4', 'Bb5', 'd4', 'c3', 'f4', 'c4', 'Bf4', 'Bg5', 'd3', 'g3',
+  'Nc6', 'Nf6', 'd6', 'Bc5', 'e6', 'd5', 'exd4', 'cxd4', 'Bb4', 'a6', 'g6', 'Bg7',
+  // 3rd moves & 4th moves
+  'Bc4', 'Bb5', 'd4', 'exd5', 'cxd5', 'Nc3', 'Nbd2', 'O-O', 'Be2', 'Bd3', 'c4', 'c3', 'a3', 'h3',
+  'Bc5', 'Bb4', 'Be7', 'Bd6', 'O-O', 'a6', 'b5', 'h6', 'Re8', 'Qe7', 'Qc7', 'Nbd7', 'd5', 'e5'
+]);
+
+/**
+ * Expected Points / Win Probability Model:
+ * Measures win probability from centipawns [0, 100]%
+ * Formula: P = 100 / (1 + 10^(-cp / 400))
+ */
+export function centipawnsToWinProbability(cp: number): number {
+  const clamped = Math.max(-2000, Math.min(2000, cp));
+  const prob = 100 / (1 + Math.pow(10, -clamped / 400));
+  return Number(prob.toFixed(1));
 }
 
 export class ChessEngineService {
@@ -154,36 +171,35 @@ export class ChessEngineService {
       }
     }
 
-    // Fast evaluation based on material + piece-square tables (0.002ms)
     const total = (materialWhite - materialBlack) + (pstWhite - pstBlack);
     return total;
   }
 
   /**
-   * Find best move using Minimax with Alpha-Beta Pruning
+   * Find best move using Minimax with Alpha-Beta pruning
    */
   public findBestMove(
     chess: Chess,
-    depth: number = 3
+    depth: number = 2
   ): { bestMove: Move | null; score: number } {
     const isMaximizing = chess.turn() === 'w';
     let bestMove: Move | null = null;
-    let alpha = -Infinity;
-    let beta = Infinity;
+    let bestScore = isMaximizing ? -Infinity : Infinity;
 
     const moves = chess.moves({ verbose: true });
     if (moves.length === 0) {
       return { bestMove: null, score: this.evaluatePosition(chess) };
     }
 
-    // Move ordering: prioritize captures and checks for faster pruning
+    // Sort moves: captures first
     moves.sort((a, b) => {
-      const scoreA = (a.captured ? PIECE_VALUES[a.captured] * 10 - PIECE_VALUES[a.piece] : 0) + (a.san.includes('+') ? 50 : 0);
-      const scoreB = (b.captured ? PIECE_VALUES[b.captured] * 10 - PIECE_VALUES[b.piece] : 0) + (b.san.includes('+') ? 50 : 0);
-      return scoreB - scoreA;
+      const valA = a.captured ? PIECE_VALUES[a.captured] : 0;
+      const valB = b.captured ? PIECE_VALUES[b.captured] : 0;
+      return valB - valA;
     });
 
-    let bestScore = isMaximizing ? -Infinity : Infinity;
+    let alpha = -Infinity;
+    let beta = Infinity;
 
     for (const move of moves) {
       chess.move(move);
@@ -228,7 +244,6 @@ export class ChessEngineService {
       return this.evaluatePosition(chess);
     }
 
-    // Quick move sort for pruning
     moves.sort((a, b) => (b.captured ? 1 : 0) - (a.captured ? 1 : 0));
 
     if (isMaximizing) {
@@ -263,67 +278,105 @@ export class ChessEngineService {
     const moves = chess.moves({ verbose: true });
     if (moves.length === 0) return null;
 
-    // Random mistake injection for beginner / casual bots
     const roll = Math.random() * 100;
     if (roll < botLevel.randomness) {
-      // Pick a random legal move or second-best move
       const randomIndex = Math.floor(Math.random() * moves.length);
       return moves[randomIndex];
     }
 
-    // Ensure minimax search depth is clamped to max 3 for instant responsiveness (<15ms)
     const effectiveDepth = Math.min(Math.max(1, botLevel.depth), 3);
     const { bestMove } = this.findBestMove(chess, effectiveDepth);
     return bestMove || moves[0];
   }
 
   /**
-   * Analyze a single move played
+   * Analyze a single move played using Chess.com's Expected Points Model
    */
   public analyzeMove(
     fenBefore: string,
     moveSan: string,
     moveFrom: string,
     moveTo: string,
-    color: PieceColor
+    color: PieceColor,
+    plyIndex: number = 0,
+    previousMoveAnalysis?: MoveAnalysis
   ): MoveAnalysis {
     const chess = new Chess(fenBefore);
     const evalBefore = this.evaluatePosition(chess);
 
-    // Compute best move before this move was played (snappy depth 2 for real-time responsiveness)
+    // Compute best move and best score before the move was played
     const { bestMove: optimalMove, score: optimalScore } = this.findBestMove(chess, 2);
     const bestMoveSan = optimalMove ? optimalMove.san : moveSan;
     const bestMoveUci = optimalMove ? `${optimalMove.from}${optimalMove.to}` : `${moveFrom}${moveTo}`;
 
-    // Now execute played move
+    // Execute played move
     const moveResult = chess.move(moveSan);
     const fenAfter = chess.fen();
     const evalAfter = this.evaluatePosition(chess);
 
-    // Perspective delta: positive delta = user improved; negative delta = user lost eval
+    // Perspective evaluations from current player's standpoint
     const playerMultiplier = color === 'w' ? 1 : -1;
     const playerEvalBefore = evalBefore * playerMultiplier;
     const playerEvalAfter = evalAfter * playerMultiplier;
+    const playerOptimalScore = optimalScore * playerMultiplier;
     const evalDelta = playerEvalAfter - playerEvalBefore;
 
-    // Classify move
-    let classification: MoveClassification = 'good';
-    const isOptimal = moveSan === bestMoveSan;
+    // Expected Points & Win Probabilities (0..100%)
+    const winProbBefore = centipawnsToWinProbability(playerEvalBefore);
+    const winProbAfter = centipawnsToWinProbability(playerEvalAfter);
+    const winProbBest = centipawnsToWinProbability(playerOptimalScore);
 
-    if (isOptimal) {
-      // Check for brilliant sacrifice: sacrificed material but maintained or improved advantage
-      const captured = moveResult?.captured;
-      const isSacrifice = !captured && (moveResult?.piece === 'q' || moveResult?.piece === 'r' || moveResult?.piece === 'b' || moveResult?.piece === 'n') && evalDelta >= 50;
-      classification = isSacrifice ? 'brilliant' : 'best';
-    } else if (evalDelta >= -20) {
+    // Expected Points drop (how much win probability dropped compared to best move)
+    const expectedPointsDrop = Math.max(0, Number((winProbBest - winProbAfter).toFixed(1)));
+
+    // Piece sacrifice check for Brilliant (!!) move
+    const piece = moveResult?.piece;
+    const captured = moveResult?.captured;
+    const isPieceSacrifice = Boolean(
+      piece && 
+      ['n', 'b', 'r', 'q'].includes(piece) &&
+      (!captured || PIECE_VALUES[piece] > PIECE_VALUES[captured]) &&
+      winProbAfter >= 45 &&
+      expectedPointsDrop <= 2.5
+    );
+
+    // Check if critical game changing move for Great (!)
+    // 1. Turned losing position into equal/solid
+    const turnedLosingToEqual = winProbBefore < 38 && winProbAfter >= 46 && expectedPointsDrop <= 1.5;
+    // 2. Turned equal position into clear win
+    const turnedEqualToWinning = winProbBefore <= 54 && winProbAfter >= 72 && expectedPointsDrop <= 1.0;
+    // 3. Only good move in the position (best move maintained eval while alternatives lose)
+    const isOnlySavingMove = (optimalMove?.san === moveSan) && (winProbBefore < 48) && (winProbAfter >= 46);
+
+    const isGreatMove = turnedLosingToEqual || turnedEqualToWinning || isOnlySavingMove;
+
+    // Check for Miss (X): Position had a winning or heavily advantageous tactical blow, but player missed it
+    const hadTacticalWin = winProbBest >= 62 || (previousMoveAnalysis && (previousMoveAnalysis.classification === 'blunder' || previousMoveAnalysis.classification === 'mistake'));
+    const isMiss = hadTacticalWin && expectedPointsDrop >= 14 && winProbAfter <= 50;
+
+    // Opening book check
+    const isBook = plyIndex <= 10 && OPENING_BOOK_SAN.has(moveSan) && expectedPointsDrop <= 3.5;
+
+    // Move Classification based on Chess.com Expected Points Model
+    let classification: MoveClassification;
+
+    if (isPieceSacrifice) {
+      classification = 'brilliant';
+    } else if (isGreatMove && optimalMove?.san === moveSan) {
+      classification = 'great';
+    } else if (isBook) {
+      classification = 'book';
+    } else if (optimalMove?.san === moveSan || expectedPointsDrop <= 0.8) {
       classification = 'best';
-    } else if (evalDelta >= -60) {
+    } else if (expectedPointsDrop <= 3.0) {
       classification = 'excellent';
-    } else if (evalDelta >= -130) {
+    } else if (expectedPointsDrop <= 7.0) {
       classification = 'good';
-    } else if (evalDelta >= -240) {
+    } else if (isMiss) {
+      classification = 'miss';
+    } else if (expectedPointsDrop <= 13.0) {
       classification = 'inaccuracy';
-    } else if (evalDelta >= -450) {
+    } else if (expectedPointsDrop <= 22.0) {
       classification = 'mistake';
     } else {
       classification = 'blunder';
@@ -336,6 +389,8 @@ export class ChessEngineService {
       classification,
       bestMoveSan,
       evalDelta,
+      expectedPointsDrop,
+      winProbAfter,
       color
     );
 
@@ -356,11 +411,14 @@ export class ChessEngineService {
       bestMoveSan,
       explanation,
       tacticalMotive,
+      winProbabilityBefore: winProbBefore,
+      winProbabilityAfter: winProbAfter,
+      expectedPointsDrop,
     };
   }
 
   /**
-   * Generates clear, instructive, rule-based chess reasoning for why to move a piece or why it was a blunder
+   * Generates clear, instructive, rule-based chess reasoning adhering to Chess.com's categories
    */
   public generateMoveExplanation(
     fenBefore: string,
@@ -368,9 +426,22 @@ export class ChessEngineService {
     moveResult: Move | null,
     classification: MoveClassification,
     bestMoveSan: string,
-    evalDelta: number,
-    color: PieceColor
+    evalDelta: number = 0,
+    param7: PieceColor | number = 0,
+    param8: number = 50,
+    param9?: PieceColor
   ): string {
+    let pointsDrop = 0;
+    let winProbAfter = 50;
+    let color: PieceColor = 'w';
+
+    if (typeof param7 === 'string') {
+      color = param7 as PieceColor;
+    } else {
+      pointsDrop = param7;
+      winProbAfter = param8;
+      color = param9 || 'w';
+    }
     if (!moveResult) return "Solid move adhering to general chess principles.";
 
     const pieceNames: Record<string, string> = {
@@ -388,45 +459,57 @@ export class ChessEngineService {
       return `Castling secures the ${color === 'w' ? 'White' : 'Black'} King behind protective pawns and connects the rooks for central coordination.`;
     }
 
-    // Blunders & Mistakes
-    if (classification === 'blunder') {
-      return `Blunder (${(evalDelta / 100).toFixed(1)} pawns)! Moving ${pName} to ${moveResult.to} overlooked crucial tactical defense or conceded severe material. Better was ${bestMoveSan}.`;
+    // Brilliant (!!)
+    if (classification === 'brilliant') {
+      return `Brilliant (!!) - A sound, voluntary piece sacrifice that is the optimal choice in the position. Even after sacrificing material, you maintain a winning ${winProbAfter}% win probability!`;
     }
-    if (classification === 'mistake') {
-      return `Mistake (${(evalDelta / 100).toFixed(1)} pawns). ${moveSan} relinquishes initiative or leaves a defensive vulnerability. Recommended was ${bestMoveSan}.`;
+
+    // Great (!)
+    if (classification === 'great') {
+      return `Great (!) - A critical game-changing resource that turns the outcome of the position or finds the only good move available to stay balanced!`;
     }
+
+    // Best (⭐)
+    if (classification === 'best') {
+      return `Best (⭐) - The optimal engine move. ${moveSan} maximizes piece activity and asserts total control with a ${winProbAfter}% win probability.`;
+    }
+
+    // Excellent (👍)
+    if (classification === 'excellent') {
+      return `Excellent (👍) - A near-top choice with only a minimal ${pointsDrop}% drop in expected points, keeping full pressure on your opponent.`;
+    }
+
+    // Book (📖)
+    if (classification === 'book') {
+      return `Book (📖) - A recognized, theoretical opening move establishing healthy central presence and piece harmony according to grandmaster theory.`;
+    }
+
+    // Good (✅)
+    if (classification === 'good') {
+      return `Good (✅) - A solid, dependable move that preserves position safety without compromising your win probability.`;
+    }
+
+    // Inaccuracy (?!)
     if (classification === 'inaccuracy') {
-      return `Inaccuracy. ${moveSan} is playable but slightly passive. ${bestMoveSan} puts higher pressure on the opponent.`;
+      return `Inaccuracy (?!) - A weak or slightly dubious move that creates minor structural weaknesses (-${pointsDrop}% win chance). Better was ${bestMoveSan}.`;
     }
 
-    // Captures
-    if (moveResult.captured) {
-      const capturedName = pieceNames[moveResult.captured] || 'piece';
-      return `Captures the enemy ${capturedName} on ${moveResult.to}, gaining material and simplifying into an advantageous position.`;
+    // Mistake (?)
+    if (classification === 'mistake') {
+      return `Mistake (?) - Noticeably worsens your position (-${pointsDrop}% win probability). ${bestMoveSan} was substantially stronger.`;
     }
 
-    // Check
-    if (moveSan.includes('+')) {
-      return `Delivers check with the ${pName} on ${moveResult.to}, forcing opponent's King to respond and seizing critical tactical tempo.`;
+    // Miss (X)
+    if (classification === 'miss') {
+      return `Miss (X) - Failed to capitalize on an opponent mistake or missed a clear tactical/winning breakthrough! ${bestMoveSan} would have seized a massive edge.`;
     }
 
-    // Central development
-    const centerSquares = ['d4', 'e4', 'd5', 'e5', 'c4', 'f4', 'c5', 'f5'];
-    if (centerSquares.includes(moveResult.to)) {
-      return `Develops the ${pName} actively to ${moveResult.to}, staking a strong claim over central squares and restricting enemy counterplay.`;
+    // Blunder (??)
+    if (classification === 'blunder') {
+      return `Blunder (??) - A severe, game-swinging blunder that dropped your win probability by ${pointsDrop}%. ${bestMoveSan} was crucial to stay in the fight.`;
     }
 
-    // Minor piece development
-    if (moveResult.piece === 'n' || moveResult.piece === 'b') {
-      return `Develops minor piece ${pName} to ${moveResult.to}, clearing back rank for castling and coordinating harmoniously with surrounding pieces.`;
-    }
-
-    // Rook to open file
-    if (moveResult.piece === 'r') {
-      return `Activates the Rook onto ${moveResult.to}, eyeing crucial open files and potential infiltration along the 7th rank.`;
-    }
-
-    return `Positions the ${pName} on ${moveResult.to} to improve piece activity, fortify structure, and prepare future tactical operations.`;
+    return `Positions the ${pName} on ${moveResult.to} to improve piece activity.`;
   }
 
   /**
@@ -438,6 +521,9 @@ export class ChessEngineService {
     moveResult: Move | null,
     classification: MoveClassification
   ): string {
+    if (classification === 'brilliant') return 'Piece Sacrifice / Brilliance';
+    if (classification === 'great') return 'Heroic Resource / Great Move';
+    if (classification === 'miss') return 'Missed Tactical Opportunity';
     if (classification === 'blunder') return 'Hanging / Tactical Overlook';
     if (moveSan.includes('#')) return 'Checkmate';
     if (moveSan.includes('+')) return 'Check / Initiative';
@@ -457,7 +543,6 @@ export class ChessEngineService {
     const board = chess.board();
     const currentTurn = chess.turn();
 
-    // Check if king is in check
     if (chess.inCheck()) {
       threats.push({
         square: currentTurn === 'w' ? 'e1' : 'e8',
@@ -468,7 +553,6 @@ export class ChessEngineService {
       });
     }
 
-    // Check for hanging / undefended pieces
     for (let r = 0; r < 8; r++) {
       for (let c = 0; c < 8; c++) {
         const piece = board[r][c];
@@ -476,8 +560,6 @@ export class ChessEngineService {
 
         const square = `${String.fromCharCode(97 + c)}${8 - r}` as Square;
         const isCurrentColor = piece.color === currentTurn;
-
-        // Count enemy attackers
         const opponentColor: Color = piece.color === 'w' ? 'b' : 'w';
         const isAttacked = chess.isAttacked(square, opponentColor);
 
@@ -548,7 +630,7 @@ export class ChessEngineService {
   }
 
   /**
-   * Calculate accuracy percentage from moves
+   * Calculate accuracy percentage using Chess.com's Expected Points CAPS2 Model
    */
   public calculateAccuracy(moves: MoveAnalysis[], color: PieceColor): number {
     const playerMoves = moves.filter((m) => m.color === color);
@@ -558,20 +640,25 @@ export class ChessEngineService {
     for (const m of playerMoves) {
       switch (m.classification) {
         case 'brilliant':
+        case 'great':
         case 'best':
+        case 'book':
           scoreSum += 100;
           break;
         case 'excellent':
-          scoreSum += 90;
+          scoreSum += 95;
           break;
         case 'good':
-          scoreSum += 75;
+          scoreSum += 80;
           break;
         case 'inaccuracy':
           scoreSum += 50;
           break;
         case 'mistake':
           scoreSum += 25;
+          break;
+        case 'miss':
+          scoreSum += 15;
           break;
         case 'blunder':
           scoreSum += 0;

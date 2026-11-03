@@ -1,5 +1,6 @@
 import { chessEngine } from './chessEngine';
-import { Chess, Square } from 'chess.js';
+import { Chess } from 'chess.js';
+import { geminiKeyService } from './geminiKeyService';
 
 export interface CoachResponse {
   source: 'ai' | 'offline_engine';
@@ -8,6 +9,17 @@ export interface CoachResponse {
 }
 
 export class CoachService {
+  private getHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    const key = geminiKeyService.getStoredApiKey();
+    if (key) {
+      headers['x-gemini-key'] = key;
+    }
+    return headers;
+  }
+
   /**
    * Explains why to move a specific piece or move
    */
@@ -19,7 +31,7 @@ export class CoachService {
     try {
       const res = await fetch('/api/gemini/coach', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getHeaders(),
         body: JSON.stringify({
           mode: 'why_move',
           fen,
@@ -74,7 +86,7 @@ export class CoachService {
     try {
       const res = await fetch('/api/gemini/coach', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getHeaders(),
         body: JSON.stringify({
           mode: 'blunder_analysis',
           fen: fenBefore,
@@ -119,7 +131,7 @@ export class CoachService {
     try {
       const res = await fetch('/api/gemini/coach', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getHeaders(),
         body: JSON.stringify({
           mode: 'custom_question',
           userQuestion: question,

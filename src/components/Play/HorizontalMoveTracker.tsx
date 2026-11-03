@@ -73,11 +73,16 @@ export const HorizontalMoveTracker: React.FC<HorizontalMoveTrackerProps> = ({
 
   const getBadgeSymbol = (cls?: string) => {
     switch (cls) {
-      case 'brilliant': return '💎';
-      case 'best': return '⭐';
-      case 'inaccuracy': return '?!';
-      case 'mistake': return '?';
-      case 'blunder': return '??';
+      case 'brilliant': return <span className="text-cyan-400 font-bold" title="Brilliant (!!)">!!</span>;
+      case 'great': return <span className="text-blue-400 font-bold" title="Great (!)">!</span>;
+      case 'best': return <span className="text-emerald-400 font-bold" title="Best (⭐)">★</span>;
+      case 'excellent': return <span className="text-lime-400 font-bold" title="Excellent (👍)">👍</span>;
+      case 'good': return <span className="text-slate-400 font-bold" title="Good (✅)">✓</span>;
+      case 'book': return <span className="text-amber-400 font-bold" title="Book (📖)">📖</span>;
+      case 'inaccuracy': return <span className="text-yellow-400 font-bold" title="Inaccuracy (?!)">?!</span>;
+      case 'mistake': return <span className="text-orange-400 font-bold" title="Mistake (?)">?</span>;
+      case 'miss': return <span className="text-rose-400 font-bold" title="Miss (X)">✕</span>;
+      case 'blunder': return <span className="text-red-500 font-bold" title="Blunder (??)">??</span>;
       default: return null;
     }
   };

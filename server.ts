@@ -12,38 +12,123 @@ const PORT = 3000;
 app.use(express.json({ limit: "2mb" }));
 app.use(express.static(path.join(process.cwd(), "public")));
 
-// Lazy initialization of Gemini client
-let genAIClient: GoogleGenAI | null = null;
-function getGenAI(): GoogleGenAI | null {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
+// Cache default env instance
+let defaultGenAIClient: GoogleGenAI | null = null;
+
+function getGenAIInstance(clientKey?: string): GoogleGenAI | null {
+  const effectiveKey = (clientKey && clientKey.trim().length > 0)
+    ? clientKey.trim()
+    : process.env.GEMINI_API_KEY;
+
+  if (!effectiveKey || effectiveKey === "MY_GEMINI_API_KEY") {
     return null;
   }
-  if (!genAIClient) {
-    genAIClient = new GoogleGenAI({ apiKey });
+
+  // If a specific client key was passed, create a fresh client for it
+  if (clientKey && clientKey.trim().length > 0) {
+    return new GoogleGenAI({
+      apiKey: clientKey.trim(),
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        },
+      },
+    });
   }
-  return genAIClient;
+
+  // Otherwise reuse cached env instance
+  if (!defaultGenAIClient) {
+    defaultGenAIClient = new GoogleGenAI({
+      apiKey: effectiveKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        },
+      },
+    });
+  }
+  return defaultGenAIClient;
 }
 
 // Health check endpoint
 app.get("/api/health", (_req, res) => {
   res.json({
     status: "ok",
-    hasGeminiKey: Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== "MY_GEMINI_API_KEY"),
+    hasServerGeminiKey: Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== "MY_GEMINI_API_KEY"),
   });
+});
+
+// Verify Gemini API Key
+app.post("/api/gemini/verify-key", async (req, res) => {
+  try {
+    const rawKey = req.body?.apiKey;
+    if (!rawKey || typeof rawKey !== "string" || rawKey.trim().length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid Gemini API key.",
+      });
+    }
+
+    const testClient = new GoogleGenAI({
+      apiKey: rawKey.trim(),
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        },
+      },
+    });
+
+    // Make a minimal test call with gemini-3.8-flash
+    const testResponse = await testClient.models.generateContent({
+      model: "gemini-3.8-flash",
+      contents: "Reply with the single word: OK",
+    });
+
+    if (testResponse.text) {
+      return res.json({
+        success: true,
+        message: "Gemini API key verified successfully! Online Grandmaster AI is now active.",
+      });
+    }
+
+    return res.status(400).json({
+      success: false,
+      message: "API key responded but no text was returned.",
+    });
+  } catch (error: any) {
+    console.error("Gemini key verification error:", error?.message || error);
+    let msg = error?.message || "Verification failed. Please check that your key is correct.";
+    try {
+      const parsed = JSON.parse(msg);
+      if (parsed?.error?.message) {
+        msg = parsed.error.message;
+      }
+    } catch {
+      // not json
+    }
+    return res.status(400).json({
+      success: false,
+      message: msg,
+    });
+  }
 });
 
 // Gemini Chess Coach Endpoint
 app.post("/api/gemini/coach", async (req, res) => {
   try {
-    const { mode, fen, move, pgn, context, userQuestion, gameSummary } = req.body;
-    const ai = getGenAI();
+    const { mode, fen, move, pgn, context, userQuestion, gameSummary, apiKey: bodyKey } = req.body;
+    const headerKey = req.headers["x-gemini-key"] as string | undefined;
+    const clientKey = (typeof bodyKey === "string" && bodyKey.trim().length > 0)
+      ? bodyKey
+      : headerKey;
+
+    const ai = getGenAIInstance(clientKey);
 
     if (!ai) {
       return res.status(200).json({
         success: false,
         fallbackToLocal: true,
-        message: "Gemini API key not configured. Using local Grandmaster tactical engine.",
+        message: "Gemini API key not configured. Provide your Gemini key in the AI menu or use the offline tactical engine.",
       });
     }
 
