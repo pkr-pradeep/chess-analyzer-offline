@@ -3,34 +3,105 @@ import { Chess, Square, Move, PieceSymbol, Color } from 'chess.js';
 import { ChessPiece, ChessPieceTheme } from './ChessPiece';
 import { ChaturangaModal } from './ChaturangaModal';
 import { MoveClassification, PieceColor } from '../../types/chess';
-import { Crown, Sparkles } from 'lucide-react';
+import { Crown, Sparkles, Star, ThumbsUp, Check, BookOpen, X } from 'lucide-react';
 
 const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
 const ranks = ['8', '7', '6', '5', '4', '3', '2', '1'];
 
-// Helper for badge icon supporting all 10 Chess.com move categories
+// Compact circular badge matching Chess.com move classification icons
 function getClassificationBadge(cls?: MoveClassification) {
+  if (!cls) return null;
   switch (cls) {
     case 'brilliant':
-      return <span className="bg-cyan-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">💎 Brilliant (!!)</span>;
+      return (
+        <div 
+          className="w-4 h-4 sm:w-5 sm:h-5 md:w-5.5 md:h-5.5 rounded-full bg-[#1baca6] border border-white/60 shadow-[0_2px_4px_rgba(0,0,0,0.5)] flex items-center justify-center text-white"
+          title="Brilliant (!!)"
+        >
+          <span className="font-black text-[8px] sm:text-[10px] md:text-[11px] leading-none tracking-tighter">!!</span>
+        </div>
+      );
     case 'great':
-      return <span className="bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">🎯 Great (!)</span>;
+      return (
+        <div 
+          className="w-4 h-4 sm:w-5 sm:h-5 md:w-5.5 md:h-5.5 rounded-full bg-[#2b72c9] border border-white/60 shadow-[0_2px_4px_rgba(0,0,0,0.5)] flex items-center justify-center text-white"
+          title="Great (!)"
+        >
+          <span className="font-black text-[9px] sm:text-[11px] md:text-[12px] leading-none">!</span>
+        </div>
+      );
     case 'best':
-      return <span className="bg-emerald-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">⭐ Best</span>;
+      return (
+        <div 
+          className="w-4 h-4 sm:w-5 sm:h-5 md:w-5.5 md:h-5.5 rounded-full bg-[#7fa650] border border-white/60 shadow-[0_2px_4px_rgba(0,0,0,0.5)] flex items-center justify-center text-white"
+          title="Best (★)"
+        >
+          <Star className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white fill-white" />
+        </div>
+      );
     case 'excellent':
-      return <span className="bg-lime-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">👍 Excellent</span>;
+      return (
+        <div 
+          className="w-4 h-4 sm:w-5 sm:h-5 md:w-5.5 md:h-5.5 rounded-full bg-[#86b541] border border-white/60 shadow-[0_2px_4px_rgba(0,0,0,0.5)] flex items-center justify-center text-white"
+          title="Excellent (👍)"
+        >
+          <ThumbsUp className="w-2 h-2 sm:w-2.5 sm:h-2.5 text-white fill-white" />
+        </div>
+      );
     case 'good':
-      return <span className="bg-slate-700 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">✅ Good</span>;
+      return (
+        <div 
+          className="w-4 h-4 sm:w-5 sm:h-5 md:w-5.5 md:h-5.5 rounded-full bg-[#5c8b3b] border border-white/60 shadow-[0_2px_4px_rgba(0,0,0,0.5)] flex items-center justify-center text-white"
+          title="Good (✓)"
+        >
+          <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white stroke-[3.5]" />
+        </div>
+      );
     case 'book':
-      return <span className="bg-amber-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">📖 Book</span>;
+      return (
+        <div 
+          className="w-4 h-4 sm:w-5 sm:h-5 md:w-5.5 md:h-5.5 rounded-full bg-[#a87442] border border-white/60 shadow-[0_2px_4px_rgba(0,0,0,0.5)] flex items-center justify-center text-white"
+          title="Book (📖)"
+        >
+          <BookOpen className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white fill-white" />
+        </div>
+      );
     case 'inaccuracy':
-      return <span className="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">⚠️ Inaccuracy (?!)</span>;
+      return (
+        <div 
+          className="w-4 h-4 sm:w-5 sm:h-5 md:w-5.5 md:h-5.5 rounded-full bg-[#e6a817] border border-white/60 shadow-[0_2px_4px_rgba(0,0,0,0.5)] flex items-center justify-center text-white"
+          title="Inaccuracy (?!)"
+        >
+          <span className="font-black text-[7.5px] sm:text-[9.5px] md:text-[10px] leading-none tracking-tighter">?!</span>
+        </div>
+      );
     case 'mistake':
-      return <span className="bg-orange-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">❓ Mistake (?)</span>;
+      return (
+        <div 
+          className="w-4 h-4 sm:w-5 sm:h-5 md:w-5.5 md:h-5.5 rounded-full bg-[#e26928] border border-white/60 shadow-[0_2px_4px_rgba(0,0,0,0.5)] flex items-center justify-center text-white"
+          title="Mistake (?)"
+        >
+          <span className="font-black text-[9px] sm:text-[11px] md:text-[12px] leading-none">?</span>
+        </div>
+      );
     case 'miss':
-      return <span className="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">❌ Miss</span>;
+      return (
+        <div 
+          className="w-4 h-4 sm:w-5 sm:h-5 md:w-5.5 md:h-5.5 rounded-full bg-[#db5244] border border-white/60 shadow-[0_2px_4px_rgba(0,0,0,0.5)] flex items-center justify-center text-white"
+          title="Miss (✕)"
+        >
+          <X className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white stroke-[3.5]" />
+        </div>
+      );
     case 'blunder':
-      return <span className="bg-rose-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">🛑 Blunder (??)</span>;
+      return (
+        <div 
+          className="w-4 h-4 sm:w-5 sm:h-5 md:w-5.5 md:h-5.5 rounded-full bg-[#c93434] border border-white/60 shadow-[0_2px_4px_rgba(0,0,0,0.5)] flex items-center justify-center text-white"
+          title="Blunder (??)"
+        >
+          <span className="font-black text-[7.5px] sm:text-[9.5px] md:text-[10px] leading-none tracking-tighter">??</span>
+        </div>
+      );
     default:
       return null;
   }
@@ -129,10 +200,12 @@ const BoardSquare: React.FC<BoardSquareProps> = React.memo(({
           {/* Destination Cell: Bold 3.5px black frame with inner contrast hairline */}
           <div className="absolute inset-0 pointer-events-none border-[3px] sm:border-[3.5px] border-slate-950 rounded-[2px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.45)] z-20" />
           {/* Refined golden corner target accents for clear arrival recognition */}
-          <div className="absolute top-0.5 left-0.5 w-1.5 h-1.5 border-t-2 border-l-2 border-amber-400 pointer-events-none z-30" />
-          <div className="absolute top-0.5 right-0.5 w-1.5 h-1.5 border-t-2 border-r-2 border-amber-400 pointer-events-none z-30" />
-          <div className="absolute bottom-0.5 left-0.5 w-1.5 h-1.5 border-b-2 border-l-2 border-amber-400 pointer-events-none z-30" />
-          <div className="absolute bottom-0.5 right-0.5 w-1.5 h-1.5 border-b-2 border-r-2 border-amber-400 pointer-events-none z-30" />
+          <div className="absolute top-0.5 left-0.5 w-1.5 h-1.5 border-t-2 border-l-2 border-amber-400 pointer-events-none z-20" />
+          {!classification && (
+            <div className="absolute top-0.5 right-0.5 w-1.5 h-1.5 border-t-2 border-r-2 border-amber-400 pointer-events-none z-20" />
+          )}
+          <div className="absolute bottom-0.5 left-0.5 w-1.5 h-1.5 border-b-2 border-l-2 border-amber-400 pointer-events-none z-20" />
+          <div className="absolute bottom-0.5 right-0.5 w-1.5 h-1.5 border-b-2 border-r-2 border-amber-400 pointer-events-none z-20" />
         </>
       ) : isLastMoveFrom ? (
         <>
@@ -164,8 +237,9 @@ const BoardSquare: React.FC<BoardSquareProps> = React.memo(({
         </span>
       )}
 
+      {/* Chess.com-style circular move category badge in the top-right corner of the cell */}
       {isLastMoveTo && classification && (
-        <div className="absolute top-1 right-1 z-20 pointer-events-none">
+        <div className="absolute top-0.5 right-0.5 sm:top-1 sm:right-1 z-30 pointer-events-none transition-transform duration-150">
           {getClassificationBadge(classification)}
         </div>
       )}

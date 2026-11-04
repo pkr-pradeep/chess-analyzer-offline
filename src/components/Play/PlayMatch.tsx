@@ -287,31 +287,20 @@ export const PlayMatch: React.FC<PlayMatchProps> = ({
             chessAudio.playMove();
           }
 
-          let analysis: MoveAnalysis;
-          if (showLiveAnalysis) {
-            analysis = chessEngine.analyzeMove(
-              fenBefore,
-              moveSan,
-              from,
-              to,
-              nextChess.turn() === 'w' ? 'b' : 'w'
-            );
-          } else {
-            const evalBefore = currentEval;
-            const evalAfter = bestMoveResult.evalCp ?? chessEngine.evaluatePosition(nextChess);
-            analysis = {
-              san: moveSan,
-              from,
-              to,
-              color: nextChess.turn() === 'w' ? 'b' : 'w',
-              fenBefore,
-              fenAfter: nextChess.fen(),
-              evalBefore,
-              evalAfter,
-              evalDelta: 0,
-              classification: 'good',
-              explanation: '',
-            };
+          const currentPly = movesHistoryRef.current.length;
+          const prevAnalysis = currentPly > 0 ? movesHistoryRef.current[currentPly - 1] : undefined;
+          const botColor: PieceColor = nextChess.turn() === 'w' ? 'b' : 'w';
+          const analysis = chessEngine.analyzeMove(
+            fenBefore,
+            moveSan,
+            from,
+            to,
+            botColor,
+            currentPly,
+            prevAnalysis
+          );
+          if (bestMoveResult.evalCp !== undefined) {
+            analysis.evalAfter = bestMoveResult.evalCp;
           }
 
           const updatedMoves = [...movesHistoryRef.current, analysis];
@@ -347,32 +336,18 @@ export const PlayMatch: React.FC<PlayMatchProps> = ({
             chessAudio.playMove();
           }
 
-          let analysis: MoveAnalysis;
-          if (showLiveAnalysis) {
-            analysis = chessEngine.analyzeMove(
-              fenBefore,
-              moveSan,
-              from,
-              to,
-              nextChess.turn() === 'w' ? 'b' : 'w'
-            );
-          } else {
-            const evalBefore = currentEval;
-            const evalAfter = chessEngine.evaluatePosition(nextChess);
-            analysis = {
-              san: moveSan,
-              from,
-              to,
-              color: nextChess.turn() === 'w' ? 'b' : 'w',
-              fenBefore,
-              fenAfter: nextChess.fen(),
-              evalBefore,
-              evalAfter,
-              evalDelta: 0,
-              classification: 'good',
-              explanation: '',
-            };
-          }
+          const currentPly = movesHistoryRef.current.length;
+          const prevAnalysis = currentPly > 0 ? movesHistoryRef.current[currentPly - 1] : undefined;
+          const botColor: PieceColor = nextChess.turn() === 'w' ? 'b' : 'w';
+          const analysis = chessEngine.analyzeMove(
+            fenBefore,
+            moveSan,
+            from,
+            to,
+            botColor,
+            currentPly,
+            prevAnalysis
+          );
 
           const updatedMoves = [...movesHistoryRef.current, analysis];
           movesHistoryRef.current = updatedMoves;
@@ -577,34 +552,20 @@ export const PlayMatch: React.FC<PlayMatchProps> = ({
     setLastPlayerMoveTime(moveDuration);
     setPlayerMoveTimes((prev) => [...prev, moveDuration]);
 
-    if (showLiveAnalysis) {
-      analysis = chessEngine.analyzeMove(
-        fenBefore,
-        moveResult.san,
-        from,
-        to,
-        playerColor
-      );
+    const currentPly = movesHistoryRef.current.length;
+    const prevAnalysis = currentPly > 0 ? movesHistoryRef.current[currentPly - 1] : undefined;
+    analysis = chessEngine.analyzeMove(
+      fenBefore,
+      moveResult.san,
+      from,
+      to,
+      playerColor,
+      currentPly,
+      prevAnalysis
+    );
 
-      if (analysis.classification === 'blunder') {
-        chessAudio.playBlunder();
-      }
-    } else {
-      const evalBefore = currentEval;
-      const evalAfter = chessEngine.evaluatePosition(nextChessInstance);
-      analysis = {
-        san: moveResult.san,
-        from,
-        to,
-        color: playerColor,
-        fenBefore,
-        fenAfter: nextChessInstance.fen(),
-        evalBefore,
-        evalAfter,
-        evalDelta: (playerColor === 'w' ? 1 : -1) * (evalAfter - evalBefore),
-        classification: 'good',
-        explanation: '',
-      };
+    if (showLiveAnalysis && analysis.classification === 'blunder') {
+      chessAudio.playBlunder();
     }
 
     analysis.timeSpentSeconds = moveDuration;

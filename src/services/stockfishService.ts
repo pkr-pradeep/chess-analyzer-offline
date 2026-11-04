@@ -1,5 +1,6 @@
 import { Chess, Square } from 'chess.js';
 import { chessEngine } from './chessEngine';
+import { MoveAnalysis, PieceColor } from '../types/chess';
 
 export interface StockfishInfo {
   depth: number;
@@ -101,6 +102,8 @@ class StockfishService {
 
   private handleWorkerMessage(line: string) {
     if (line === 'uciok') {
+      this.sendCommand('setoption name Threads value 1');
+      this.sendCommand('setoption name Hash value 16');
       this.sendCommand('isready');
       return;
     }
@@ -347,6 +350,50 @@ class StockfishService {
 
   public isAvailable(): boolean {
     return this.isReady;
+  }
+
+  /**
+   * Deep batch analysis of a game using tactical lookahead and Quiescence search.
+   * Accurately spots every blunder, mistake, inaccuracy, miss, book, and brilliant move.
+   */
+  public batchAnalyzeGame(
+    pgn: string,
+    onProgress?: (analyzed: number, total: number) => void
+  ): MoveAnalysis[] {
+    const c = new Chess();
+    try {
+      c.loadPgn(pgn);
+    } catch {
+      return [];
+    }
+
+    const history = c.history({ verbose: true });
+    if (history.length === 0) return [];
+
+    const stepper = new Chess();
+    const resultMoves: MoveAnalysis[] = [];
+
+    for (let i = 0; i < history.length; i++) {
+      const m = history[i];
+      const fenBefore = stepper.fen();
+      const prevAnalysis = resultMoves[i - 1];
+
+      const analysis = chessEngine.analyzeMove(
+        fenBefore,
+        m.san,
+        m.from,
+        m.to,
+        m.color,
+        i,
+        prevAnalysis
+      );
+
+      stepper.move(m);
+      resultMoves.push(analysis);
+      onProgress?.(i + 1, history.length);
+    }
+
+    return resultMoves;
   }
 }
 

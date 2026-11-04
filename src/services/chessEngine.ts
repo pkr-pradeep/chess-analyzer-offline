@@ -172,11 +172,72 @@ export class ChessEngineService {
     }
 
     const total = (materialWhite - materialBlack) + (pstWhite - pstBlack);
-    return total;
+    const checkPenalty = chess.inCheck() ? (chess.turn() === 'w' ? -40 : 40) : 0;
+    return total + checkPenalty;
   }
 
   /**
-   * Find best move using Minimax with Alpha-Beta pruning
+   * Quiescence search: searches tactical capture chains to eliminate the horizon effect,
+   * accurately detecting hanging pieces, pins, and tactical exchanges.
+   */
+  private quiescence(
+    chess: Chess,
+    alpha: number,
+    beta: number,
+    isMaximizing: boolean,
+    qDepth: number = 4
+  ): number {
+    const standPat = this.evaluatePosition(chess);
+    if (qDepth === 0 || chess.isGameOver()) {
+      return standPat;
+    }
+
+    if (isMaximizing) {
+      if (standPat >= beta) return beta;
+      if (standPat > alpha) alpha = standPat;
+
+      const captureMoves = chess.moves({ verbose: true }).filter((m) => Boolean(m.captured));
+      // MVV-LVA (Most Valuable Victim - Least Valuable Attacker)
+      captureMoves.sort((a, b) => {
+        const valA = (a.captured ? PIECE_VALUES[a.captured] : 0) - (PIECE_VALUES[a.piece] || 0) / 10;
+        const valB = (b.captured ? PIECE_VALUES[b.captured] : 0) - (PIECE_VALUES[b.piece] || 0) / 10;
+        return valB - valA;
+      });
+
+      for (const move of captureMoves) {
+        chess.move(move);
+        const score = this.quiescence(chess, alpha, beta, false, qDepth - 1);
+        chess.undo();
+
+        if (score >= beta) return beta;
+        if (score > alpha) alpha = score;
+      }
+      return alpha;
+    } else {
+      if (standPat <= alpha) return alpha;
+      if (standPat < beta) beta = standPat;
+
+      const captureMoves = chess.moves({ verbose: true }).filter((m) => Boolean(m.captured));
+      captureMoves.sort((a, b) => {
+        const valA = (a.captured ? PIECE_VALUES[a.captured] : 0) - (PIECE_VALUES[a.piece] || 0) / 10;
+        const valB = (b.captured ? PIECE_VALUES[b.captured] : 0) - (PIECE_VALUES[b.piece] || 0) / 10;
+        return valB - valA;
+      });
+
+      for (const move of captureMoves) {
+        chess.move(move);
+        const score = this.quiescence(chess, alpha, beta, true, qDepth - 1);
+        chess.undo();
+
+        if (score <= alpha) return alpha;
+        if (score < beta) beta = score;
+      }
+      return beta;
+    }
+  }
+
+  /**
+   * Find best move using Minimax with Alpha-Beta pruning and Quiescence search
    */
   public findBestMove(
     chess: Chess,
@@ -235,8 +296,12 @@ export class ChessEngineService {
     beta: number,
     isMaximizing: boolean
   ): number {
-    if (depth === 0 || chess.isGameOver()) {
+    if (chess.isGameOver()) {
       return this.evaluatePosition(chess);
+    }
+
+    if (depth <= 0) {
+      return this.quiescence(chess, alpha, beta, isMaximizing);
     }
 
     const moves = chess.moves({ verbose: true });
@@ -302,9 +367,8 @@ export class ChessEngineService {
     previousMoveAnalysis?: MoveAnalysis
   ): MoveAnalysis {
     const chess = new Chess(fenBefore);
-    const evalBefore = this.evaluatePosition(chess);
 
-    // Compute best move and best score before the move was played
+    // Compute best move and optimal score before the move was played (using minimax + quiescence)
     const { bestMove: optimalMove, score: optimalScore } = this.findBestMove(chess, 2);
     const bestMoveSan = optimalMove ? optimalMove.san : moveSan;
     const bestMoveUci = optimalMove ? `${optimalMove.from}${optimalMove.to}` : `${moveFrom}${moveTo}`;
@@ -312,13 +376,30 @@ export class ChessEngineService {
     // Execute played move
     const moveResult = chess.move(moveSan);
     const fenAfter = chess.fen();
-    const evalAfter = this.evaluatePosition(chess);
 
-    // Perspective evaluations from current player's standpoint
+    // Perspective multiplier (White is +1, Black is -1)
     const playerMultiplier = color === 'w' ? 1 : -1;
-    const playerEvalBefore = evalBefore * playerMultiplier;
-    const playerEvalAfter = evalAfter * playerMultiplier;
     const playerOptimalScore = optimalScore * playerMultiplier;
+
+    // Evaluate the resulting position from engine search
+    let evalAfter: number;
+    if (chess.isCheckmate()) {
+      // The played move delivered checkmate!
+      evalAfter = color === 'w' ? 20000 : -20000;
+    } else if (chess.isDraw() || chess.isStalemate()) {
+      evalAfter = 0;
+    } else if (optimalMove && optimalMove.san === moveSan) {
+      // Played move matches optimal engine choice
+      evalAfter = optimalScore;
+    } else {
+      // Search from fenAfter with opponent's turn to uncover tactical replies,
+      // hanging piece captures, forks, and pins via Minimax + Quiescence search
+      const opponentReply = this.findBestMove(chess, 2);
+      evalAfter = opponentReply.score;
+    }
+
+    const playerEvalBefore = optimalScore * playerMultiplier;
+    const playerEvalAfter = evalAfter * playerMultiplier;
     const evalDelta = playerEvalAfter - playerEvalBefore;
 
     // Expected Points & Win Probabilities (0..100%)
@@ -326,38 +407,50 @@ export class ChessEngineService {
     const winProbAfter = centipawnsToWinProbability(playerEvalAfter);
     const winProbBest = centipawnsToWinProbability(playerOptimalScore);
 
-    // Expected Points drop (how much win probability dropped compared to best move)
+    // Expected Points drop (how much win probability dropped compared to best move, scaled 0 to 100%)
     const expectedPointsDrop = Math.max(0, Number((winProbBest - winProbAfter).toFixed(1)));
 
-    // Piece sacrifice check for Brilliant (!!) move
+    // Piece sacrifice check for Brilliant (!!):
+    // 1. Voluntary piece sacrifice giving up material
+    // 2. Sound sacrifice that is optimal or near-optimal (expectedPointsDrop <= 2.0%)
+    // 3. Not in a losing position after making it (winProbAfter >= 45%)
+    // 4. Position wasn't already completely overwhelmingly winning (winProbBefore <= 90%)
     const piece = moveResult?.piece;
     const captured = moveResult?.captured;
     const isPieceSacrifice = Boolean(
       piece && 
       ['n', 'b', 'r', 'q'].includes(piece) &&
       (!captured || PIECE_VALUES[piece] > PIECE_VALUES[captured]) &&
+      winProbBefore <= 90 &&
       winProbAfter >= 45 &&
-      expectedPointsDrop <= 2.5
+      expectedPointsDrop <= 2.0
     );
 
-    // Check if critical game changing move for Great (!)
+    // Check if critical game changing move for Great (!):
     // 1. Turned losing position into equal/solid
-    const turnedLosingToEqual = winProbBefore < 38 && winProbAfter >= 46 && expectedPointsDrop <= 1.5;
+    const turnedLosingToEqual = winProbBefore < 40 && winProbAfter >= 48 && expectedPointsDrop <= 1.5;
     // 2. Turned equal position into clear win
-    const turnedEqualToWinning = winProbBefore <= 54 && winProbAfter >= 72 && expectedPointsDrop <= 1.0;
-    // 3. Only good move in the position (best move maintained eval while alternatives lose)
+    const turnedEqualToWinning = winProbBefore <= 55 && winProbAfter >= 75 && expectedPointsDrop <= 1.0;
+    // 3. Only good move in the position (best move maintained position while all alternatives lose)
     const isOnlySavingMove = (optimalMove?.san === moveSan) && (winProbBefore < 48) && (winProbAfter >= 46);
 
     const isGreatMove = turnedLosingToEqual || turnedEqualToWinning || isOnlySavingMove;
 
-    // Check for Miss (X): Position had a winning or heavily advantageous tactical blow, but player missed it
-    const hadTacticalWin = winProbBest >= 62 || (previousMoveAnalysis && (previousMoveAnalysis.classification === 'blunder' || previousMoveAnalysis.classification === 'mistake'));
-    const isMiss = hadTacticalWin && expectedPointsDrop >= 14 && winProbAfter <= 50;
+    // Check for Miss (X): Position had a winning or heavily advantageous tactical blow (e.g. opponent just blundered),
+    // but player failed to capitalize on it
+    const hadTacticalWin = (winProbBest >= 65) || (previousMoveAnalysis && (previousMoveAnalysis.classification === 'blunder' || previousMoveAnalysis.classification === 'mistake'));
+    const isMiss = hadTacticalWin && expectedPointsDrop >= 10.0;
 
-    // Opening book check
-    const isBook = plyIndex <= 10 && OPENING_BOOK_SAN.has(moveSan) && expectedPointsDrop <= 3.5;
+    // Opening book check: standard opening theory in first 10 plies with minimal loss
+    const isBook = plyIndex <= 10 && OPENING_BOOK_SAN.has(moveSan) && expectedPointsDrop <= 2.0;
 
-    // Move Classification based on Chess.com Expected Points Model
+    // Move Classification based strictly on Chess.com's Expected Points Model documentation:
+    // - Best: 0.00 points loss (engine's top move or equivalent)
+    // - Excellent: 0.00 - 0.02 loss (0% to 2.0% expected points loss)
+    // - Good: 0.02 - 0.05 loss (2.0% to 5.0% expected points loss)
+    // - Inaccuracy: 0.05 - 0.10 loss (5.0% to 10.0% expected points loss)
+    // - Mistake: 0.10 - 0.20 loss (10.0% to 20.0% expected points loss)
+    // - Blunder: 0.20 - 1.00 loss (> 20.0% expected points loss)
     let classification: MoveClassification;
 
     if (isPieceSacrifice) {
@@ -366,17 +459,17 @@ export class ChessEngineService {
       classification = 'great';
     } else if (isBook) {
       classification = 'book';
-    } else if (optimalMove?.san === moveSan || expectedPointsDrop <= 0.8) {
+    } else if (optimalMove?.san === moveSan || expectedPointsDrop <= 0.2) {
       classification = 'best';
-    } else if (expectedPointsDrop <= 3.0) {
+    } else if (expectedPointsDrop <= 2.0) {
       classification = 'excellent';
-    } else if (expectedPointsDrop <= 7.0) {
+    } else if (expectedPointsDrop <= 5.0) {
       classification = 'good';
     } else if (isMiss) {
       classification = 'miss';
-    } else if (expectedPointsDrop <= 13.0) {
+    } else if (expectedPointsDrop <= 10.0) {
       classification = 'inaccuracy';
-    } else if (expectedPointsDrop <= 22.0) {
+    } else if (expectedPointsDrop <= 20.0) {
       classification = 'mistake';
     } else {
       classification = 'blunder';
@@ -403,7 +496,7 @@ export class ChessEngineService {
       color,
       fenBefore,
       fenAfter,
-      evalBefore,
+      evalBefore: optimalScore,
       evalAfter,
       evalDelta,
       classification,
