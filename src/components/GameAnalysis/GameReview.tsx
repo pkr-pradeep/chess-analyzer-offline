@@ -346,26 +346,42 @@ export const GameReview: React.FC<GameReviewProps> = ({
           </div>
 
           {/* Dual Accuracy Scores */}
-          <div className="flex items-center gap-6 self-start md:self-auto">
+          <div className="flex items-center gap-4 sm:gap-6 self-start md:self-auto">
             <div className="text-center">
-              <div className="text-xs font-medium text-slate-400 mb-1">White Accuracy</div>
-              <div className="text-2xl font-bold font-mono text-slate-100 flex items-center justify-center gap-1">
+              <div className="text-xs font-medium text-slate-400 mb-1">
+                {game.playerColor === 'w' ? (
+                  <span className="text-amber-400 font-semibold">Your Accuracy (White)</span>
+                ) : (
+                  'White Accuracy'
+                )}
+              </div>
+              <div className="text-xl sm:text-2xl font-bold font-mono text-slate-100 flex items-center justify-center gap-1">
                 {game.whiteAccuracy}%
               </div>
-              <div className="text-[10px] text-slate-500">
-                {categoryCounts.whiteCounts.blunder} Blunders • {categoryCounts.whiteCounts.miss} Misses
+              <div className="text-[10px] text-slate-400">
+                <span className={categoryCounts.whiteCounts.blunder > 0 ? 'text-rose-400 font-bold' : ''}>
+                  {categoryCounts.whiteCounts.blunder} Blunders
+                </span> • {categoryCounts.whiteCounts.miss} Misses
               </div>
             </div>
 
             <div className="h-10 w-px bg-slate-800" />
 
             <div className="text-center">
-              <div className="text-xs font-medium text-slate-400 mb-1">Black Accuracy</div>
-              <div className="text-2xl font-bold font-mono text-slate-100 flex items-center justify-center gap-1">
+              <div className="text-xs font-medium text-slate-400 mb-1">
+                {game.playerColor === 'b' ? (
+                  <span className="text-amber-400 font-semibold">Your Accuracy (Black)</span>
+                ) : (
+                  'Black Accuracy'
+                )}
+              </div>
+              <div className="text-xl sm:text-2xl font-bold font-mono text-slate-100 flex items-center justify-center gap-1">
                 {game.blackAccuracy}%
               </div>
-              <div className="text-[10px] text-slate-500">
-                {categoryCounts.blackCounts.blunder} Blunders • {categoryCounts.blackCounts.miss} Misses
+              <div className="text-[10px] text-slate-400">
+                <span className={categoryCounts.blackCounts.blunder > 0 ? 'text-rose-400 font-bold' : ''}>
+                  {categoryCounts.blackCounts.blunder} Blunders
+                </span> • {categoryCounts.blackCounts.miss} Misses
               </div>
             </div>
           </div>

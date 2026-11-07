@@ -233,16 +233,75 @@ export const ProgressDashboard: React.FC<ProgressDashboardProps> = ({
         </div>
       </div>
 
-      {/* Match History Table */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
-        <div className="flex items-center justify-between mb-4">
+      {/* Match History Table & Mobile/Tablet Wireframe */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 sm:p-5 shadow-xl">
+        <div className="flex items-center justify-between mb-3 sm:mb-4">
           <h3 className="text-sm font-bold text-slate-100">
             Recent Match Analysis & Replay
           </h3>
-          <span className="text-xs text-slate-500">Click to step through full move analysis</span>
+          <span className="text-xs text-slate-500 hidden sm:inline">Click to step through full move analysis</span>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Mobile & Tablet Screen Wireframe: Zero Horizontal Scroll */}
+        <div className="lg:hidden space-y-2">
+          {games.length === 0 ? (
+            <div className="text-center py-6 text-slate-500 text-xs">
+              No matches played yet.
+            </div>
+          ) : (
+            games.map((g) => {
+              const isWhite = g.playerColor === 'w';
+              const opponentName = isWhite ? g.blackPlayer : g.whitePlayer;
+              const isWin = (g.result === '1-0' && isWhite) || (g.result === '0-1' && !isWhite);
+              const isDraw = g.result === '1/2-1/2';
+
+              return (
+                <div
+                  key={g.id}
+                  className="flex items-center justify-between p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 hover:border-slate-700 transition-all gap-2.5"
+                >
+                  {/* 1. Opponent Name */}
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className="text-xs sm:text-sm font-semibold text-slate-200 truncate">
+                      {opponentName}
+                    </span>
+                  </div>
+
+                  {/* 2. Win or Loss */}
+                  <div className="shrink-0">
+                    <span
+                      className={`px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-bold inline-flex items-center justify-center min-w-[50px] text-center ${
+                        isWin
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                          : isDraw
+                          ? 'bg-slate-800 text-slate-300 border border-slate-700'
+                          : 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                      }`}
+                    >
+                      {isWin ? 'Won' : isDraw ? 'Draw' : 'Lost'}
+                    </span>
+                  </div>
+
+                  {/* 3. Analyse Button */}
+                  <div className="shrink-0">
+                    <button
+                      id={`btn-analyze-${g.id}`}
+                      type="button"
+                      onClick={() => onReviewGame(g)}
+                      className="text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-sm cursor-pointer active:scale-95"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Analyze</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Desktop Screen Wireframe: Full Details Table */}
+        <div className="hidden lg:block overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="border-b border-slate-800 text-slate-400 uppercase tracking-wider font-semibold">
               <tr>
@@ -286,7 +345,7 @@ export const ProgressDashboard: React.FC<ProgressDashboardProps> = ({
                     <td className="py-3 px-3 text-right">
                       <button
                         onClick={() => onReviewGame(g)}
-                        className="text-xs bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 px-3 py-1 rounded-lg font-sans font-semibold flex items-center gap-1.5 ml-auto transition-colors"
+                        className="text-xs bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 px-3 py-1 rounded-lg font-sans font-semibold flex items-center gap-1.5 ml-auto transition-colors cursor-pointer"
                       >
                         <Eye className="w-3.5 h-3.5" /> Analyze
                       </button>

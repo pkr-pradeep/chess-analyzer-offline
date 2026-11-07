@@ -30,10 +30,12 @@ export const PuzzleTrainer: React.FC<PuzzleTrainerProps> = ({
 }) => {
   const [selectedTheme, setSelectedTheme] = useState<string>('all');
   const [currentPuzzleIndex, setCurrentPuzzleIndex] = useState<number>(0);
-  const [status, setStatus] = useState<'solving' | 'success' | 'failed'>('solving');
+  const [status, setStatus] = useState<'solving' | 'success'>('solving');
   const [showHint, setShowHint] = useState<boolean>(false);
   const [showSolution, setShowSolution] = useState<boolean>(false);
   const [moveIndex, setMoveIndex] = useState<number>(0);
+  const [moveError, setMoveError] = useState<string | null>(null);
+  const [hasFailedAttempt, setHasFailedAttempt] = useState<boolean>(false);
 
   // Filtered puzzle list
   const filteredPuzzles = puzzles.filter((p) => {
@@ -59,6 +61,8 @@ export const PuzzleTrainer: React.FC<PuzzleTrainerProps> = ({
       setShowSolution(false);
       setMoveIndex(0);
       setLastMove(null);
+      setMoveError(null);
+      setHasFailedAttempt(false);
     }
   }, [activePuzzle?.id]);
 
@@ -90,6 +94,7 @@ export const PuzzleTrainer: React.FC<PuzzleTrainerProps> = ({
 
     if (matchesSan || matchesUci) {
       // Correct user move!
+      setMoveError(null);
       puzzleChess.move({ from, to, promotion: promotion || 'q' });
       setPuzzleChess(new Chess(puzzleChess.fen()));
       setLastMove({ from, to });
@@ -102,7 +107,7 @@ export const PuzzleTrainer: React.FC<PuzzleTrainerProps> = ({
         // Solved full puzzle!
         setStatus('success');
         chessAudio.playSuccess();
-        onPuzzleSolved(activePuzzle, true, 12);
+        onPuzzleSolved(activePuzzle, !hasFailedAttempt, hasFailedAttempt ? 4 : 12);
       } else {
         // Automatic opponent reply from solution sequence
         setTimeout(() => {
@@ -119,16 +124,19 @@ export const PuzzleTrainer: React.FC<PuzzleTrainerProps> = ({
             // End of line
             setStatus('success');
             chessAudio.playSuccess();
-            onPuzzleSolved(activePuzzle, true, 12);
+            onPuzzleSolved(activePuzzle, !hasFailedAttempt, hasFailedAttempt ? 4 : 12);
           }
         }, 500);
       }
       return true;
     } else {
-      // Incorrect move
-      setStatus('failed');
+      // Incorrect move: Keep current board position & moveIndex so user can continue from this move!
       chessAudio.playBlunder();
-      onPuzzleSolved(activePuzzle, false, -8);
+      if (!hasFailedAttempt) {
+        setHasFailedAttempt(true);
+        onPuzzleSolved(activePuzzle, false, -8);
+      }
+      setMoveError(`${moveResult.san} is not the winning continuation. You can continue from this position—find the right continuation!`);
       return false;
     }
   };
@@ -138,12 +146,13 @@ export const PuzzleTrainer: React.FC<PuzzleTrainerProps> = ({
     setCurrentPuzzleIndex(nextIdx);
   };
 
-  const handleRetry = () => {
+  const handleRestartFromBeginning = () => {
     if (activePuzzle) {
       setPuzzleChess(new Chess(activePuzzle.fen));
       setStatus('solving');
       setMoveIndex(0);
       setLastMove(null);
+      setMoveError(null);
     }
   };
 
@@ -202,9 +211,14 @@ export const PuzzleTrainer: React.FC<PuzzleTrainerProps> = ({
               <span className="font-semibold text-slate-200">
                 {activePuzzle.playerToMove === 'w' ? 'White' : 'Black'} to move & win
               </span>
-              <span>
-                Puzzle {currentPuzzleIndex + 1} of {filteredPuzzles.length}
-              </span>
+              <div className="flex items-center gap-2.5">
+                <span className="bg-slate-800 text-slate-300 font-mono px-2 py-0.5 rounded text-[11px]">
+                  Move {Math.floor(moveIndex / 2) + 1} of {Math.ceil(activePuzzle.solution.length / 2)}
+                </span>
+                <span>
+                  Puzzle {currentPuzzleIndex + 1} of {filteredPuzzles.length}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -237,25 +251,38 @@ export const PuzzleTrainer: React.FC<PuzzleTrainerProps> = ({
               <div className="p-3.5 bg-emerald-950/40 border border-emerald-500/40 rounded-xl text-emerald-300 text-xs space-y-1">
                 <div className="font-bold flex items-center gap-1.5 text-sm">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  Tactical Victory! (+12 Rating)
+                  Tactical Victory! {hasFailedAttempt ? '(+4 Rating)' : '(+12 Rating)'}
                 </div>
                 <p className="text-slate-300 leading-relaxed pt-1">{activePuzzle.explanation}</p>
               </div>
             )}
 
-            {status === 'failed' && (
+            {moveError && status !== 'success' && (
               <div className="p-3.5 bg-rose-950/40 border border-rose-500/40 rounded-xl text-rose-300 text-xs space-y-2">
-                <div className="font-bold flex items-center gap-1.5 text-sm">
-                  <XCircle className="w-4 h-4 text-rose-400" />
-                  Incorrect Move (-8 Rating)
+                <div className="font-bold flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-1.5">
+                    <XCircle className="w-4 h-4 text-rose-400" />
+                    Incorrect Move
+                  </span>
+                  <span className="text-[11px] font-mono text-rose-400/90 font-bold">
+                    Move {Math.floor(moveIndex / 2) + 1} of {Math.ceil(activePuzzle.solution.length / 2)}
+                  </span>
                 </div>
-                <p className="text-slate-300">That wasn't the critical winning sequence. Try again or check the hint!</p>
-                <button
-                  onClick={handleRetry}
-                  className="bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" /> Try Again
-                </button>
+                <p className="text-slate-200 leading-relaxed">{moveError}</p>
+                <div className="flex items-center justify-between pt-1 border-t border-rose-900/40 text-xs">
+                  <span className="text-[11px] text-amber-300 font-medium">
+                    Board is ready — make another move from here!
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleRestartFromBeginning}
+                    className="text-[11px] text-slate-400 hover:text-slate-200 underline cursor-pointer flex items-center gap-1"
+                    title="Start this puzzle over from move 1"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Start over</span>
+                  </button>
+                </div>
               </div>
             )}
 
