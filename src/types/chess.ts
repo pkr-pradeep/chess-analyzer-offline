@@ -98,19 +98,39 @@ export interface RatingPoint {
   accuracy?: number;
 }
 
+export type PuzzleTheme = 
+  | 'fork' 
+  | 'pin' 
+  | 'skewer' 
+  | 'back_rank' 
+  | 'deflection' 
+  | 'hanging_piece' 
+  | 'endgame' 
+  | 'mate'
+  | 'jump_discovery'
+  | 'undermining'
+  | 'overloading'
+  | 'interference'
+  | 'decoy'
+  | 'clearance'
+  | 'zwischenzug'
+  | 'smothered_mate'
+  | 'greek_gift';
+
 export interface ChessPuzzle {
   id: string;
   title: string;
   fen: string;
   solution: string[]; // sequence of SAN moves or UCI moves e.g. ['Nf6+', 'Kh8', 'Bxf7']
   playerToMove: PieceColor;
-  theme: 'fork' | 'pin' | 'skewer' | 'back_rank' | 'deflection' | 'hanging_piece' | 'endgame' | 'mate';
+  theme: PuzzleTheme;
   rating: number;
   difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
   hint: string;
   explanation: string;
   isUserBlunder?: boolean;
   originGameId?: string;
+  bookReference?: string;
 }
 
 export interface ImprovementPlan {

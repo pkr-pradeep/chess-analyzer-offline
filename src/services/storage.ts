@@ -1,6 +1,7 @@
 import { Chess } from 'chess.js';
 import { GameRecord, RatingPoint, ChessPuzzle, ImprovementPlan, MoveAnalysis } from '../types/chess';
 import { chessEngine } from './chessEngine';
+import { MASTER_BOOK_PUZZLES } from '../data/bookPuzzles';
 
 export function parsePgnToMoves(pgn: string): MoveAnalysis[] {
   if (!pgn) return [];
@@ -34,81 +35,8 @@ const STORAGE_KEYS = {
   USER_PREFERENCES: 'chess_bot_prefs_v1',
 };
 
-// High-quality initial practice puzzles
-const INITIAL_PUZZLES: ChessPuzzle[] = [
-  {
-    id: 'puz-fork-1',
-    title: 'Royal Knight Fork',
-    fen: 'r1b1k2r/pppp1ppp/8/4N3/1b1qn3/2N5/PPPP1PPP/R1BQKB1R w KQkq - 0 7',
-    solution: ['Qf3', 'Qxe5', 'Qxf7+'],
-    playerToMove: 'w',
-    theme: 'fork',
-    rating: 1250,
-    difficulty: 'Beginner',
-    hint: 'Look for the vulnerable f7 square defended only by the Black King.',
-    explanation: 'Qf3 exerts lethal double pressure on f7 while defending e4. Black is forced to concede material.',
-  },
-  {
-    id: 'puz-backrank-1',
-    title: 'Back-Rank Decoy',
-    fen: '3r2k1/5ppp/8/8/8/8/1Q3PPP/6K1 w - - 0 1',
-    solution: ['Qb8', 'Rxb8', 'Rxd8#'],
-    playerToMove: 'w',
-    theme: 'back_rank',
-    rating: 1320,
-    difficulty: 'Beginner',
-    hint: 'Notice Black King has no flight squares ("luft") on the 8th rank.',
-    explanation: 'Sacrificing the Queen on the back rank deflects the defending Rook, delivering an inescapable back-rank checkmate.',
-  },
-  {
-    id: 'puz-pin-1',
-    title: 'Absolute Pin Conversion',
-    fen: 'r3kb1r/pppq1ppp/2n1pn2/1B1p4/3P4/2N1PN2/PPP2PPP/R1BQK2R w KQkq - 0 6',
-    solution: ['Ne5', 'Qd6', 'Bxc6+'],
-    playerToMove: 'w',
-    theme: 'pin',
-    rating: 1450,
-    difficulty: 'Intermediate',
-    hint: 'Black Knight on c6 is pinned to the King/Queen. Pile up pressure!',
-    explanation: 'Ne5 adds a second attacker to the pinned c6-knight. Black cannot defend both threats without breaking pawn structure.',
-  },
-  {
-    id: 'puz-deflection-1',
-    title: 'Queen Deflection Mate',
-    fen: '5rk1/5ppp/8/8/8/1B6/4qPPP/2Q3K1 w - - 0 1',
-    solution: ['Bxf7+', 'Rxf7', 'Qc8+', 'Rf8', 'Qxf8#'],
-    playerToMove: 'w',
-    theme: 'deflection',
-    rating: 1580,
-    difficulty: 'Intermediate',
-    hint: 'Can you deflect the f7 defense and break open the back rank?',
-    explanation: 'Bxf7+ forces the King or Rook to move, allowing Qc8+ followed by forced back-rank execution.',
-  },
-  {
-    id: 'puz-endgame-1',
-    title: 'Lucena Bridge Building',
-    fen: '1K1R4/1P3k2/8/8/8/8/7r/8 w - - 0 1',
-    solution: ['Rd4', 'Ke7', 'Kc7', 'Rc2+', 'Kb6', 'Rb2+', 'Kc6'],
-    playerToMove: 'w',
-    theme: 'endgame',
-    rating: 1750,
-    difficulty: 'Advanced',
-    hint: 'Set up the 4th rank rook shield to block horizontal checks.',
-    explanation: 'The classic Lucena technique: placing the rook on the 4th rank prepares a shield ("bridge") against enemy rook checks.',
-  },
-  {
-    id: 'puz-skewer-1',
-    title: 'Lethal Rook Skewer',
-    fen: '8/8/8/4k3/8/8/1r6/R3K3 w - - 0 1',
-    solution: ['Ra4'],
-    playerToMove: 'w',
-    theme: 'skewer',
-    rating: 1200,
-    difficulty: 'Beginner',
-    hint: 'Cut off the King and keep your pieces coordinated.',
-    explanation: 'Active rook placement cuts off the King from penetrating the queenside.',
-  },
-];
+// High-quality initial practice puzzles from chess classics & Dave Regis
+const INITIAL_PUZZLES: ChessPuzzle[] = MASTER_BOOK_PUZZLES;
 
 // Realistic seeded games so dashboard has rich initial progress visuals
 const SEED_GAMES: GameRecord[] = [
@@ -278,6 +206,21 @@ export class OfflineStorageService {
     }
   }
 
+  public updateGame(game: GameRecord): void {
+    const games = this.getGames();
+    const index = games.findIndex((g) => g.id === game.id);
+    if (index >= 0) {
+      games[index] = game;
+      this.saveGames(games);
+    } else {
+      this.saveGames([game, ...games]);
+    }
+  }
+
+  public saveGame(game: GameRecord): void {
+    this.updateGame(game);
+  }
+
   public addGame(game: GameRecord): void {
     const games = this.getGames();
     const updated = [game, ...games.filter(g => g.id !== game.id)];
@@ -344,7 +287,16 @@ export class OfflineStorageService {
         this.savePuzzles(INITIAL_PUZZLES);
         return INITIAL_PUZZLES;
       }
-      return JSON.parse(data);
+      const existing: ChessPuzzle[] = JSON.parse(data);
+      // Ensure all master book puzzles are included alongside any custom user blunder puzzles
+      const existingIds = new Set(existing.map((p) => p.id));
+      const missingMasterPuzzles = MASTER_BOOK_PUZZLES.filter((p) => !existingIds.has(p.id));
+      if (missingMasterPuzzles.length > 0) {
+        const merged = [...existing, ...missingMasterPuzzles];
+        this.savePuzzles(merged);
+        return merged;
+      }
+      return existing;
     } catch {
       return INITIAL_PUZZLES;
     }
@@ -560,3 +512,4 @@ export class OfflineStorageService {
 }
 
 export const offlineStorage = new OfflineStorageService();
+export const storageService = offlineStorage;

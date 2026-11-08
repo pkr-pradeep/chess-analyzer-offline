@@ -2,7 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Chess, Square } from 'chess.js';
 import { GameRecord, MoveAnalysis, MoveClassification } from '../../types/chess';
 import { ChessBoard } from '../ChessBoard/ChessBoard';
-import { parsePgnToMoves } from '../../services/storage';
+import { parsePgnToMoves, storageService } from '../../services/storage';
+import { stockfishService } from '../../services/stockfishService';
+import { chessEngine } from '../../services/chessEngine';
 import { chessAudio } from '../../utils/chessAudio';
 import { 
   ChevronLeft, 
@@ -16,7 +18,9 @@ import {
   TrendingUp,
   Brain,
   Filter,
-  CheckCircle2
+  CheckCircle2,
+  Cpu,
+  RefreshCw
 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 
@@ -151,7 +155,7 @@ export const GameReview: React.FC<GameReviewProps> = ({
   const [selectedFilterCategory, setSelectedFilterCategory] = useState<MoveClassification | 'all'>('all');
 
   // Reconstruct chess moves reliably from moves or pgn
-  const moves: MoveAnalysis[] = useMemo(() => {
+  const initialMoves: MoveAnalysis[] = useMemo(() => {
     if (game.moves && game.moves.length > 0 && game.moves[0].fenAfter) {
       return game.moves;
     }
@@ -162,14 +166,66 @@ export const GameReview: React.FC<GameReviewProps> = ({
     return game.moves || [];
   }, [game]);
 
-  const totalSteps = moves.length;
+  const [activeMoves, setActiveMoves] = useState<MoveAnalysis[]>(initialMoves);
+  const [isStockfishAnalyzing, setIsStockfishAnalyzing] = useState<boolean>(false);
+  const [stockfishProgress, setStockfishProgress] = useState<{ current: number; total: number; currentSan?: string } | null>(null);
+  const [analyzedWithStockfish, setAnalyzedWithStockfish] = useState<boolean>(false);
 
-  // Reset to initial step when a different game is selected
+  // Sync when game changes
   useEffect(() => {
+    setActiveMoves(initialMoves);
+    setAnalyzedWithStockfish(false);
     setCurrentStep(0);
     setIsPlaying(false);
     setSelectedFilterCategory('all');
-  }, [game.id]);
+  }, [game.id, initialMoves]);
+
+  const moves = activeMoves;
+  const totalSteps = moves.length;
+
+  // Run deep analysis with Stockfish 19 WebAssembly
+  const handleRunStockfishAnalysis = async () => {
+    if (isStockfishAnalyzing || !game.pgn) return;
+    setIsStockfishAnalyzing(true);
+    setStockfishProgress({ current: 0, total: moves.length, currentSan: '' });
+
+    try {
+      const stockfishResults = await stockfishService.batchAnalyzeGameAsync(
+        game.pgn,
+        (current, total, currentSan) => {
+          setStockfishProgress({ current, total, currentSan });
+        },
+        10
+      );
+
+      if (stockfishResults.length > 0) {
+        setActiveMoves(stockfishResults);
+        setAnalyzedWithStockfish(true);
+        const whiteAcc = chessEngine.calculateAccuracy(stockfishResults, 'w');
+        const blackAcc = chessEngine.calculateAccuracy(stockfishResults, 'b');
+        const updatedGame: GameRecord = {
+          ...game,
+          moves: stockfishResults,
+          whiteAccuracy: whiteAcc,
+          blackAccuracy: blackAcc,
+        };
+        storageService.saveGame(updatedGame);
+      }
+    } catch (err) {
+      console.error('[Stockfish 19] Analysis failed:', err);
+    } finally {
+      setIsStockfishAnalyzing(false);
+      setStockfishProgress(null);
+    }
+  };
+
+  const whiteAccuracy = useMemo(() => {
+    return chessEngine.calculateAccuracy(moves, 'w');
+  }, [moves]);
+
+  const blackAccuracy = useMemo(() => {
+    return chessEngine.calculateAccuracy(moves, 'b');
+  }, [moves]);
 
   // Compute tally of all 10 categories dynamically
   const categoryCounts = useMemo(() => {
@@ -356,7 +412,7 @@ export const GameReview: React.FC<GameReviewProps> = ({
                 )}
               </div>
               <div className="text-xl sm:text-2xl font-bold font-mono text-slate-100 flex items-center justify-center gap-1">
-                {game.whiteAccuracy}%
+                {whiteAccuracy.toFixed(1)}%
               </div>
               <div className="text-[10px] text-slate-400">
                 <span className={categoryCounts.whiteCounts.blunder > 0 ? 'text-rose-400 font-bold' : ''}>
@@ -376,7 +432,7 @@ export const GameReview: React.FC<GameReviewProps> = ({
                 )}
               </div>
               <div className="text-xl sm:text-2xl font-bold font-mono text-slate-100 flex items-center justify-center gap-1">
-                {game.blackAccuracy}%
+                {blackAccuracy.toFixed(1)}%
               </div>
               <div className="text-[10px] text-slate-400">
                 <span className={categoryCounts.blackCounts.blunder > 0 ? 'text-rose-400 font-bold' : ''}>
@@ -386,6 +442,53 @@ export const GameReview: React.FC<GameReviewProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Stockfish 19 WebAssembly Engine Status & Deep Analysis Trigger */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-3.5 border-b border-slate-800 pb-3.5 text-xs">
+          <div className="flex items-center gap-2">
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-slate-200 font-mono flex items-center gap-1.5 font-semibold">
+              <Cpu className="w-4 h-4 text-cyan-400" />
+              {stockfishService.getEngineName()}
+            </span>
+            {analyzedWithStockfish && (
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                Stockfish 19 Verified
+              </span>
+            )}
+          </div>
+
+          <button
+            onClick={handleRunStockfishAnalysis}
+            disabled={isStockfishAnalyzing || !game.pgn}
+            className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:opacity-50 text-white font-medium flex items-center gap-2 shadow-md transition-all cursor-pointer text-xs"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isStockfishAnalyzing ? 'animate-spin' : ''}`} />
+            <span>{isStockfishAnalyzing ? 'Analyzing with Stockfish 19...' : 'Run Stockfish 19 Deep Analysis'}</span>
+          </button>
+        </div>
+
+        {/* Live Analysis Progress Bar */}
+        {isStockfishAnalyzing && stockfishProgress && (
+          <div className="p-3 bg-slate-950/80 rounded-xl border border-cyan-500/30 space-y-1.5 mt-3">
+            <div className="flex justify-between text-xs text-slate-300 font-mono">
+              <span className="flex items-center gap-1.5 text-cyan-300">
+                <Cpu className="w-3.5 h-3.5 animate-pulse" />
+                Stockfish 19 WebAssembly evaluating move {stockfishProgress.current} / {stockfishProgress.total} {stockfishProgress.currentSan ? `(${stockfishProgress.currentSan})` : ''}
+              </span>
+              <span className="font-bold text-cyan-400">
+                {Math.round((stockfishProgress.current / Math.max(1, stockfishProgress.total)) * 100)}%
+              </span>
+            </div>
+            <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+              <div 
+                className="bg-gradient-to-r from-cyan-500 to-blue-500 h-full transition-all duration-150"
+                style={{ width: `${(stockfishProgress.current / Math.max(1, stockfishProgress.total)) * 100}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* SECTION: Chess.com 10 Move Categories Breakdown Grid */}
         <div className="pt-4 pb-2">
@@ -565,11 +668,16 @@ export const GameReview: React.FC<GameReviewProps> = ({
           {currentMoveAnalysis ? (
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3 shadow-lg">
               <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-lg font-bold font-mono text-slate-100">
                     {Math.ceil(currentStep / 2)}. {currentMoveAnalysis.san}
                   </span>
                   {getCategoryBadge(currentMoveAnalysis.classification)}
+                  {currentMoveAnalysis.tacticalMotive && (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                      {currentMoveAnalysis.tacticalMotive}
+                    </span>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2 text-right">

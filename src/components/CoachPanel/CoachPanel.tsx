@@ -222,7 +222,7 @@ export const CoachPanel: React.FC<CoachPanelProps> = ({
                     ? 'bg-amber-950/30 border-amber-500/30 text-amber-100'
                     : 'bg-emerald-950/30 border-emerald-500/30 text-emerald-100'
                 }`}>
-                  <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
                     <span className="font-semibold text-sm flex items-center gap-1.5">
                       {lastMoveAnalysis.classification === 'blunder' && <ShieldAlert className="w-4 h-4 text-rose-400" />}
                       {lastMoveAnalysis.classification === 'mistake' && <AlertTriangle className="w-4 h-4 text-orange-400" />}
@@ -232,9 +232,16 @@ export const CoachPanel: React.FC<CoachPanelProps> = ({
                       )}
                       Last Move: <span className="font-mono font-bold">{lastMoveAnalysis.san}</span>
                     </span>
-                    <span className="text-xs px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-black/40">
-                      {lastMoveAnalysis.classification}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {lastMoveAnalysis.tacticalMotive && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                          {lastMoveAnalysis.tacticalMotive}
+                        </span>
+                      )}
+                      <span className="text-xs px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-black/40">
+                        {lastMoveAnalysis.classification}
+                      </span>
+                    </div>
                   </div>
 
                   <p className="text-xs leading-relaxed text-slate-300">

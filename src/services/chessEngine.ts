@@ -87,18 +87,80 @@ export interface TacticalThreat {
   description: string;
 }
 
-// Standard Opening Book Lines
+// Standard Grandmaster Opening Book Lines (John Emms: Discovering Openings & Pete Tamburro)
 const OPENING_BOOK_SAN = new Set([
   // 1st moves
   'e4', 'd4', 'c4', 'Nf3', 'g3', 'f4', 'b3', 'Nc3',
   'e5', 'c5', 'e6', 'c6', 'd5', 'Nf6', 'g6', 'd6', 'b6',
   // 2nd moves
   'Nf3', 'Nc3', 'Bc4', 'Bb5', 'd4', 'c3', 'f4', 'c4', 'Bf4', 'Bg5', 'd3', 'g3',
-  'Nc6', 'Nf6', 'd6', 'Bc5', 'e6', 'd5', 'exd4', 'cxd4', 'Bb4', 'a6', 'g6', 'Bg7',
+  'Nc6', 'Nf6', 'd6', 'Bc5', 'e6', 'd5', 'exd4', 'cxd4', 'Bb4', 'a6', 'g6', 'Bg7', 'c5',
   // 3rd moves & 4th moves
-  'Bc4', 'Bb5', 'd4', 'exd5', 'cxd5', 'Nc3', 'Nbd2', 'O-O', 'Be2', 'Bd3', 'c4', 'c3', 'a3', 'h3',
-  'Bc5', 'Bb4', 'Be7', 'Bd6', 'O-O', 'a6', 'b5', 'h6', 'Re8', 'Qe7', 'Qc7', 'Nbd7', 'd5', 'e5'
+  'Bc4', 'Bb5', 'd4', 'exd5', 'cxd5', 'Nc3', 'Nbd2', 'O-O', 'Be2', 'Bd3', 'c4', 'c3', 'a3', 'h3', 'Bxc6', 'Nxd4', 'Nxe5', 'Nxe4',
+  'Bc5', 'Bb4', 'Be7', 'Bd6', 'O-O', 'a6', 'b5', 'h6', 'Re8', 'Qe7', 'Qc7', 'Nbd7', 'd5', 'e5', 'Nxd5', 'dxe4', 'Nxe4', 'dxc6', 'bxc6',
+  // 5th to 7th moves
+  'Re1', 'd3', 'h3', 'a4', 'Bb3', 'Ba4', 'Qe2', 'Qd3', 'Qc2', 'Bg5', 'Be3', 'Nbd2', 'Rad1', 'Rac1',
+  'd6', 'Re8', 'Bb7', 'Ba6', 'Na5', 'b4', 'c6', 'exd4', 'Nxd4', 'Nf6', 'Bg4', 'Bd7', 'Qd7'
 ]);
+
+export interface OpeningInfo {
+  eco: string;
+  name: string;
+  keyIdea: string;
+}
+
+export function identifyOpening(moves: string[]): OpeningInfo | null {
+  const line = moves.slice(0, 6).join(' ');
+  if (line.startsWith('e4 e5 Nf3 Nc6 Bc4 Bc5')) {
+    return { eco: 'C50', name: 'Italian Game (Giuoco Piano)', keyIdea: 'Rapid minor piece development eyeing f7 and preparing c3/d4.' };
+  }
+  if (line.startsWith('e4 e5 Nf3 Nc6 Bc4 Nf6')) {
+    return { eco: 'C55', name: "Two Knights' Defence", keyIdea: 'Dynamic counter-attack against White’s e4 pawn and center.' };
+  }
+  if (line.startsWith('e4 e5 Nf3 Nc6 Bb5 a6')) {
+    return { eco: 'C68', name: 'Ruy Lopez (Morphy Defence)', keyIdea: 'Indirect central pressure on e5 and queenside pawn tension.' };
+  }
+  if (line.startsWith('e4 e5 Nf3 Nc6 Bb5')) {
+    return { eco: 'C60', name: 'Ruy Lopez (Spanish Opening)', keyIdea: 'Pinning the c6 knight to exert long-term pressure on e5.' };
+  }
+  if (line.startsWith('e4 e5 Nf3 Nc6 d4')) {
+    return { eco: 'C45', name: 'Scotch Game', keyIdea: 'Immediate central blast liquidating e5 and opening the d-file.' };
+  }
+  if (line.startsWith('e4 e5 Nf3 Nf6')) {
+    return { eco: 'C42', name: "Petroff's Defence", keyIdea: 'Classical symmetric counter-strike against White’s e4 pawn.' };
+  }
+  if (line.startsWith('e4 e5 Nf3 d6')) {
+    return { eco: 'C41', name: "Philidor's Defence", keyIdea: 'Solid pawn support for e5 with cautious piece development.' };
+  }
+  if (line.startsWith('e4 c5 Nf3')) {
+    return { eco: 'B20', name: 'Sicilian Defence (Open Variation)', keyIdea: 'Asymmetric counterplay trading flank c-pawn for central d-pawn.' };
+  }
+  if (line.startsWith('e4 c5')) {
+    return { eco: 'B20', name: 'Sicilian Defence', keyIdea: 'Imbalancing the position by fighting for d4 from the flank.' };
+  }
+  if (line.startsWith('e4 e6 d4 d5')) {
+    return { eco: 'C00', name: 'French Defence', keyIdea: 'Solid central wedge with immediate counter-attack against d4.' };
+  }
+  if (line.startsWith('e4 c6 d4 d5')) {
+    return { eco: 'B10', name: 'Caro-Kann Defence', keyIdea: 'Ultra-solid pawn structure preparing ...d5 without blocking the light bishop.' };
+  }
+  if (line.startsWith('d4 d5 c4 e6')) {
+    return { eco: 'D30', name: "Queen's Gambit Declined", keyIdea: 'Rock-solid defense of the d5 stronghold with central equilibrium.' };
+  }
+  if (line.startsWith('d4 d5 c4')) {
+    return { eco: 'D06', name: "Queen's Gambit", keyIdea: 'Offering a flank pawn to build a broad central pawn duo (d4/e4).' };
+  }
+  if (line.startsWith('d4 Nf6 c4 g6')) {
+    return { eco: 'E60', name: "King's Indian Defence", keyIdea: 'Hypermodern flank fianchetto with explosive kingside counter-punch.' };
+  }
+  if (line.startsWith('c4')) {
+    return { eco: 'A10', name: 'English Opening', keyIdea: 'Controlling d5 from the flank while keeping central pawn options flexible.' };
+  }
+  if (line.startsWith('Nf3')) {
+    return { eco: 'A04', name: 'Reti Opening', keyIdea: 'Flexible knight development controlling central light squares.' };
+  }
+  return null;
+}
 
 /**
  * Expected Points / Win Probability Model:
@@ -356,6 +418,7 @@ export class ChessEngineService {
 
   /**
    * Analyze a single move played using Chess.com's Expected Points Model
+   * Supports optional high-precision Stockfish 19 WebAssembly evaluations
    */
   public analyzeMove(
     fenBefore: string,
@@ -364,14 +427,35 @@ export class ChessEngineService {
     moveTo: string,
     color: PieceColor,
     plyIndex: number = 0,
-    previousMoveAnalysis?: MoveAnalysis
+    previousMoveAnalysis?: MoveAnalysis,
+    engineEval?: {
+      evalBefore?: number; // In centipawns (from White's perspective)
+      evalAfter?: number;  // In centipawns (from White's perspective)
+      bestMoveSan?: string;
+      bestMoveUci?: string;
+    }
   ): MoveAnalysis {
     const chess = new Chess(fenBefore);
 
-    // Compute best move and optimal score before the move was played (using minimax + quiescence)
-    const { bestMove: optimalMove, score: optimalScore } = this.findBestMove(chess, 2);
-    const bestMoveSan = optimalMove ? optimalMove.san : moveSan;
-    const bestMoveUci = optimalMove ? `${optimalMove.from}${optimalMove.to}` : `${moveFrom}${moveTo}`;
+    let optimalScore: number;
+    let bestMoveSan: string;
+    let bestMoveUci: string;
+    let optimalMove: any = null;
+
+    if (engineEval?.evalBefore !== undefined && engineEval.bestMoveSan) {
+      optimalScore = engineEval.evalBefore;
+      bestMoveSan = engineEval.bestMoveSan;
+      bestMoveUci = engineEval.bestMoveUci || `${moveFrom}${moveTo}`;
+      const legalMoves = chess.moves({ verbose: true });
+      optimalMove = legalMoves.find((m) => m.san === bestMoveSan || `${m.from}${m.to}` === bestMoveUci) || null;
+    } else {
+      // Compute best move and optimal score before the move was played (using minimax + quiescence)
+      const found = this.findBestMove(chess, 2);
+      optimalMove = found.bestMove;
+      optimalScore = found.score;
+      bestMoveSan = optimalMove ? optimalMove.san : moveSan;
+      bestMoveUci = optimalMove ? `${optimalMove.from}${optimalMove.to}` : `${moveFrom}${moveTo}`;
+    }
 
     // Execute played move
     const moveResult = chess.move(moveSan);
@@ -388,12 +472,13 @@ export class ChessEngineService {
       evalAfter = color === 'w' ? 20000 : -20000;
     } else if (chess.isDraw() || chess.isStalemate()) {
       evalAfter = 0;
+    } else if (engineEval?.evalAfter !== undefined) {
+      evalAfter = engineEval.evalAfter;
     } else if (optimalMove && optimalMove.san === moveSan) {
       // Played move matches optimal engine choice
       evalAfter = optimalScore;
     } else {
-      // Search from fenAfter with opponent's turn to uncover tactical replies,
-      // hanging piece captures, forks, and pins via Minimax + Quiescence search
+      // Search from fenAfter with opponent's turn to uncover tactical replies
       const opponentReply = this.findBestMove(chess, 2);
       evalAfter = opponentReply.score;
     }
@@ -549,64 +634,64 @@ export class ChessEngineService {
 
     // Castling
     if (moveSan === 'O-O' || moveSan === 'O-O-O') {
-      return `Castling secures the ${color === 'w' ? 'White' : 'Black'} King behind protective pawns and connects the rooks for central coordination.`;
+      return `Castling (FIDE Art. 3) secures the ${color === 'w' ? 'White' : 'Black'} King behind an intact pawn shield and connects the rooks for central file control (Chernev: Logical Chess).`;
     }
 
     // Brilliant (!!)
     if (classification === 'brilliant') {
-      return `Brilliant (!!) - A sound, voluntary piece sacrifice that is the optimal choice in the position. Even after sacrificing material, you maintain a winning ${winProbAfter}% win probability!`;
+      return `Brilliant (!!) - A voluntary piece sacrifice that is optimal in the position! As Irving Chernev noted: "Tactics flow from a logically sound position." Even down material, your active initiative secures a commanding ${winProbAfter}% win probability!`;
     }
 
     // Great (!)
     if (classification === 'great') {
-      return `Great (!) - A critical game-changing resource that turns the outcome of the position or finds the only good move available to stay balanced!`;
+      return `Great (!) - A critical game-changing resource that turns the position around or finds the sole surviving resource to maintain equilibrium under immense pressure!`;
     }
 
     // Best (⭐)
     if (classification === 'best') {
-      return `Best (⭐) - The optimal engine move. ${moveSan} maximizes piece activity and asserts total control with a ${winProbAfter}% win probability.`;
+      return `Best (★) - Optimal engine move. ${moveSan} maximizes piece activity, centralized presence (Zlatanovic: Fundamental Strategy), and asserts total board control with ${winProbAfter}% win probability.`;
     }
 
     // Excellent (👍)
     if (classification === 'excellent') {
-      return `Excellent (👍) - A near-top choice with only a minimal ${pointsDrop}% drop in expected points, keeping full pressure on your opponent.`;
+      return `Excellent (👍) - A high-level grandmaster choice with only a minimal ${pointsDrop}% points drop, maintaining strong pressure and piece harmony.`;
     }
 
     // Book (📖)
     if (classification === 'book') {
-      return `Book (📖) - A recognized, theoretical opening move establishing healthy central presence and piece harmony according to grandmaster theory.`;
+      return `Book (📖) - Grandmaster theoretical opening move. Conforms to John Emms's 4 Golden Rules: fight for the centre, develop minor pieces with purpose, and prepare early castling.`;
     }
 
     // Good (✅)
     if (classification === 'good') {
-      return `Good (✅) - A solid, dependable move that preserves position safety without compromising your win probability.`;
+      return `Good (✓) - A solid, dependable move preserving position safety and tactical coordination without risking your win probability.`;
     }
 
     // Inaccuracy (?!)
     if (classification === 'inaccuracy') {
-      return `Inaccuracy (?!) - A weak or slightly dubious move that creates minor structural weaknesses (-${pointsDrop}% win chance). Better was ${bestMoveSan}.`;
+      return `Inaccuracy (?!) - A slightly suboptimal move creating minor structural weaknesses (-${pointsDrop}% expected points). ${bestMoveSan} was cleaner. Zlatanovic's advice: "If the opponent neglects centralisation, just improve yours!"`;
     }
 
     // Mistake (?)
     if (classification === 'mistake') {
-      return `Mistake (?) - Noticeably worsens your position (-${pointsDrop}% win probability). ${bestMoveSan} was substantially stronger.`;
+      return `Mistake (?) - Noticeably compromises your position (-${pointsDrop}% win probability). ${bestMoveSan} was substantially better to preserve harmony.`;
     }
 
     // Miss (X)
     if (classification === 'miss') {
-      return `Miss (X) - Failed to capitalize on an opponent mistake or missed a clear tactical/winning breakthrough! ${bestMoveSan} would have seized a massive edge.`;
+      return `Miss (✕) - Missed a clear tactical strike or failed to punish an opponent flaw! Remember Dan Heisman's rule: "Loose Pieces Drop Off" (LPDO). ${bestMoveSan} would have seized a decisive advantage.`;
     }
 
     // Blunder (??)
     if (classification === 'blunder') {
-      return `Blunder (??) - A severe, game-swinging blunder that dropped your win probability by ${pointsDrop}%. ${bestMoveSan} was crucial to stay in the fight.`;
+      return `Blunder (??) - A severe blunder dropping your win probability by ${pointsDrop}%. Dr. Dave Regis: The most common reason games are lost is giving away a piece for nothing or falling into a fork. ${bestMoveSan} was crucial.`;
     }
 
     return `Positions the ${pName} on ${moveResult.to} to improve piece activity.`;
   }
 
   /**
-   * Detect tactical motives (Pin, Fork, Hanging Piece, King Safety, etc.)
+   * Detect tactical motives based on Dr. Dave Regis, Dan Heisman, and Boroljub Zlatanovic
    */
   private detectTacticalMotive(
     fenBefore: string,
@@ -616,15 +701,54 @@ export class ChessEngineService {
   ): string {
     if (classification === 'brilliant') return 'Piece Sacrifice / Brilliance';
     if (classification === 'great') return 'Heroic Resource / Great Move';
-    if (classification === 'miss') return 'Missed Tactical Opportunity';
-    if (classification === 'blunder') return 'Hanging / Tactical Overlook';
+    if (classification === 'miss') return 'Missed Tactical Opportunity (LPDO)';
+    if (classification === 'blunder') return 'Hanging Piece / Tactical Overlook';
     if (moveSan.includes('#')) return 'Checkmate';
-    if (moveSan.includes('+')) return 'Check / Initiative';
-    if (moveSan === 'O-O' || moveSan === 'O-O-O') return 'King Safety';
-    if (moveResult?.captured) return 'Material Capture';
-    if (moveResult?.piece === 'n' || moveResult?.piece === 'b') return 'Piece Development';
-    if (moveResult?.piece === 'p' && ['e4', 'd4', 'e5', 'd5'].includes(moveResult.to)) return 'Central Control';
-    if (moveResult?.piece === 'r') return 'File Activation';
+    
+    // Check if move gives check
+    if (moveSan.includes('+')) {
+      if (moveSan.includes('Nf7') || moveSan.includes('Bf7') || moveSan.includes('Bxf7') || moveSan.includes('Nxf7')) {
+        return 'Weak f7/f2 Attack (Wilson)';
+      }
+      return 'Check / Forcing Initiative';
+    }
+
+    if (moveSan === 'O-O' || moveSan === 'O-O-O') return 'King Safety & Castling';
+    
+    if (moveResult) {
+      const { piece, to, captured } = moveResult;
+      
+      // Greek gift motif: Bxh7+ or Bxh2+
+      if (piece === 'b' && (to === 'h7' || to === 'h2') && captured) {
+        return 'Greek Gift Sacrifice (Bxh7+)';
+      }
+
+      // Smothered mate motif
+      if (piece === 'n' && (to === 'g7' || to === 'f7' || to === 'g2' || to === 'f2') && moveSan.includes('#')) {
+        return 'Smothered Mate Pattern';
+      }
+
+      // Centralization (Boroljub Zlatanovic)
+      if (['e4', 'd4', 'e5', 'd5', 'c4', 'c5'].includes(to)) {
+        return 'Central Control & Harmony (Zlatanovic)';
+      }
+
+      // Capturing undefended/loose piece (Dan Heisman LPDO)
+      if (captured) {
+        return 'Material Capture / LPDO Conversion';
+      }
+
+      // Developing minor pieces (Emms Golden Rules)
+      if (piece === 'n' || piece === 'b') {
+        return 'Minor Piece Development (Emms)';
+      }
+
+      // File activation for heavy pieces
+      if (piece === 'r') {
+        return 'Open File Activation';
+      }
+    }
+
     return 'Positional Harmony';
   }
 

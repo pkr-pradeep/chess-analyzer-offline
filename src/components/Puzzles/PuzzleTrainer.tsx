@@ -21,14 +21,24 @@ interface PuzzleTrainerProps {
   puzzles: ChessPuzzle[];
   currentRating: number;
   onPuzzleSolved: (puzzle: ChessPuzzle, success: boolean, ratingChange: number) => void;
+  initialTheme?: string;
 }
 
 export const PuzzleTrainer: React.FC<PuzzleTrainerProps> = ({
   puzzles,
   currentRating,
   onPuzzleSolved,
+  initialTheme,
 }) => {
-  const [selectedTheme, setSelectedTheme] = useState<string>('all');
+  const [selectedTheme, setSelectedTheme] = useState<string>(initialTheme || 'all');
+
+  useEffect(() => {
+    if (initialTheme) {
+      setSelectedTheme(initialTheme);
+      setCurrentPuzzleIndex(0);
+    }
+  }, [initialTheme]);
+
   const [currentPuzzleIndex, setCurrentPuzzleIndex] = useState<number>(0);
   const [status, setStatus] = useState<'solving' | 'success'>('solving');
   const [showHint, setShowHint] = useState<boolean>(false);
@@ -166,9 +176,17 @@ export const PuzzleTrainer: React.FC<PuzzleTrainerProps> = ({
             { id: 'all', label: 'All Puzzles' },
             { id: 'my_blunders', label: `My Game Blunders (${puzzles.filter(p => p.isUserBlunder).length})` },
             { id: 'fork', label: 'Forks' },
-            { id: 'pin', label: 'Pins & Skewers' },
+            { id: 'pin', label: 'Pins' },
+            { id: 'skewer', label: 'Skewers' },
+            { id: 'jump_discovery', label: 'Discoveries / Jumps' },
+            { id: 'undermining', label: 'Undermining' },
+            { id: 'overloading', label: 'Overloading' },
+            { id: 'interference', label: 'Interference' },
+            { id: 'decoy', label: 'Decoys & Deflection' },
+            { id: 'clearance', label: 'Clearance' },
+            { id: 'smothered_mate', label: 'Smothered / Special Mate' },
+            { id: 'greek_gift', label: 'Greek Gift' },
             { id: 'back_rank', label: 'Back-Rank Mate' },
-            { id: 'deflection', label: 'Deflection' },
             { id: 'endgame', label: 'Endgames' },
           ].map((theme) => (
             <button
@@ -229,9 +247,9 @@ export const PuzzleTrainer: React.FC<PuzzleTrainerProps> = ({
             {/* Title & tags */}
             <div className="flex items-start justify-between">
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-[11px] uppercase font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                    {activePuzzle.theme.replace('_', ' ')}
+                    {activePuzzle.theme.replace(/_/g, ' ')}
                   </span>
                   <span className="text-xs text-slate-400">Rating {activePuzzle.rating}</span>
                   {activePuzzle.isUserBlunder && (
@@ -243,6 +261,12 @@ export const PuzzleTrainer: React.FC<PuzzleTrainerProps> = ({
                 <h3 className="text-lg font-bold text-slate-100 mt-1">
                   {activePuzzle.title}
                 </h3>
+                {activePuzzle.bookReference && (
+                  <p className="text-[11px] text-amber-400/90 font-medium mt-1 flex items-center gap-1.5">
+                    <BookmarkCheck className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span>{activePuzzle.bookReference}</span>
+                  </p>
+                )}
               </div>
             </div>
 

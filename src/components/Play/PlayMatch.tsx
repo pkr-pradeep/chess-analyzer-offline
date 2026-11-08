@@ -241,20 +241,20 @@ export const PlayMatch: React.FC<PlayMatchProps> = ({
 
         if (bot.id === 'novice') {
           skillLevel = 1;
-          searchDepth = 2;
-          movetimeMs = 70;
+          searchDepth = 3;
+          movetimeMs = 80;
         } else if (bot.id === 'casual') {
-          skillLevel = 5;
-          searchDepth = 4;
-          movetimeMs = 100;
-        } else if (bot.id === 'club') {
-          skillLevel = 10;
-          searchDepth = 6;
+          skillLevel = 6;
+          searchDepth = 5;
           movetimeMs = 120;
+        } else if (bot.id === 'club') {
+          skillLevel = 12;
+          searchDepth = 8;
+          movetimeMs = 180;
         } else if (bot.id === 'master') {
           skillLevel = 20;
-          searchDepth = 8;
-          movetimeMs = 160;
+          searchDepth = 12;
+          movetimeMs = 280;
         }
 
         const bestMoveResult = await stockfishService.getBestMove(
@@ -584,6 +584,15 @@ export const PlayMatch: React.FC<PlayMatchProps> = ({
     setCurrentEval(analysis.evalAfter);
     setMovesHistory(updatedMoves);
     setActiveMoveIndex(updatedMoves.length - 1);
+
+    // Asynchronously update evaluation bar with Stockfish 19 WebAssembly in background
+    if (showLiveAnalysis && stockfishService.isAvailable()) {
+      stockfishService.evaluatePosition(nextChessInstance.fen(), 10, 160).then((info) => {
+        if (info.scoreCp !== undefined) {
+          setCurrentEval(info.scoreCp);
+        }
+      }).catch(() => {});
+    }
 
     // 4. Check if player's move ended game, else schedule bot
     if (nextChessInstance.isGameOver()) {

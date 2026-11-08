@@ -8,6 +8,7 @@ import { Header } from './components/Header';
 import { PlayMatch } from './components/Play/PlayMatch';
 import { GameReview } from './components/GameAnalysis/GameReview';
 import { PuzzleTrainer } from './components/Puzzles/PuzzleTrainer';
+import { ChessGuide } from './components/Guide/ChessGuide';
 import { ImprovementPlanner } from './components/ImprovementPlan/ImprovementPlanner';
 import { ProgressDashboard } from './components/Dashboard/ProgressDashboard';
 import { GeminiKeyModal } from './components/GeminiKeyModal';
@@ -17,7 +18,8 @@ import { GameRecord, RatingPoint, ChessPuzzle, ImprovementPlan, MoveAnalysis } f
 import { BookmarkCheck } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'play' | 'review' | 'puzzles' | 'plan' | 'dashboard'>('play');
+  const [activeTab, setActiveTab] = useState<'play' | 'review' | 'puzzles' | 'guide' | 'plan' | 'dashboard'>('play');
+  const [puzzleFilterTheme, setPuzzleFilterTheme] = useState<string>('all');
   const [games, setGames] = useState<GameRecord[]>([]);
   const [ratings, setRatings] = useState<RatingPoint[]>([]);
   const [puzzles, setPuzzles] = useState<ChessPuzzle[]>([]);
@@ -239,6 +241,22 @@ export default function App() {
               puzzles={puzzles}
               currentRating={currentRating}
               onPuzzleSolved={handlePuzzleSolved}
+              initialTheme={puzzleFilterTheme}
+            />
+          </div>
+        )}
+
+        {/* Comprehensive Chess Guide & Master Lessons */}
+        {activeTab === 'guide' && (
+          <div className="w-full h-full overflow-y-auto max-w-7xl mx-auto p-3 sm:p-6">
+            <ChessGuide
+              onNavigateToPuzzles={(theme) => {
+                setPuzzleFilterTheme(theme || 'all');
+                setActiveTab('puzzles');
+              }}
+              onNavigateToPlay={() => {
+                setActiveTab('play');
+              }}
             />
           </div>
         )}

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chess-bot-v5';
+const CACHE_NAME = 'chess-bot-v6';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -8,6 +8,9 @@ const STATIC_ASSETS = [
   '/maskable-icon-512.png',
   '/icon.svg',
   '/apple-touch-icon.png',
+  '/stockfish-19-lite-single.js',
+  '/stockfish-19-lite-single.wasm',
+  '/stockfish-19-asm.js',
   '/stockfish.js',
   '/stockfish.wasm',
   '/stockfish.wasm.js',

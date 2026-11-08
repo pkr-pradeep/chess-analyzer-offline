@@ -69,7 +69,11 @@ export class CoachService {
 
     return {
       source: 'offline_engine',
-      content: `Tactical Rationale (Offline Engine):\n• ${explanation}\n• Maintains piece harmony and prevents enemy counterplay.\n• Safe coordinate placement with active board presence.`,
+      content: `Grandmaster Coach Insight (Offline Engine):
+• Motive: ${explanation}
+• Strategic Logic (Chernev: Logical Chess): Piece moves with purpose, fighting for central control and developing towards active squares.
+• Tactical Safety (Heisman: LPDO): Ensure no friendly pieces were left loose or undefended after making this move.
+• Next Objective: Watch for opponent counterplay in the center and prepare coordinated king safety.`,
       isOffline: true,
     };
   }
@@ -111,11 +115,11 @@ export class CoachService {
 
     return {
       source: 'offline_engine',
-      content: `Tactical Blunder Breakdown (Offline Engine):
-1. The Flaw: ${moveSan} yielded significant positional or material compensation.
-2. Punishment: Opponent gains a ${(Math.abs(evalDelta)/100).toFixed(1)} pawn tactical edge.
-3. Recommended Move: ${bestMoveSan} was substantially better to preserve balance.
-4. Coach's Tip: Always double-check which squares are defended after moving your piece!`,
+      content: `Tactical Blunder Breakdown (Master Coach):
+1. The Flaw: ${moveSan} yielded significant compensation (dropped ${(Math.abs(evalDelta)/100).toFixed(1)} pawns in evaluation).
+2. The Tactical Threat: Opponent can exploit loose piece geometry, unmasked lines, or an exposed King (Dr. Dave Regis: The Three Most Common Reasons Games Are Lost).
+3. Recommended Alternative: ${bestMoveSan} was substantially stronger, keeping piece harmony and central balance.
+4. Coach's Golden Rule (Dan Heisman LPDO): "Loose Pieces Drop Off! Always check what is attacked and what is defended before you let go of the piece!"`,
       isOffline: true,
     };
   }
@@ -158,11 +162,18 @@ export class CoachService {
     const threats = chessEngine.scanPositionTactics(chess);
     const threatsSummary = threats.length > 0
       ? threats.map(t => `• ${t.description}`).join('\n')
-      : '• No immediate undefended pieces found. Focus on piece activity and king safety.';
+      : '• No immediate loose or undefended pieces detected. Pieces are functioning harmoniously.';
 
     return {
       source: 'offline_engine',
-      content: `Offline Coach Assessment for Current Position:\n${threatsSummary}\n\nKey Principles:\n• Keep King sheltered behind pawn shield.\n• Look for forks and pins on opponent's uncoordinated pieces.\n• Fight for central squares (d4, e4, d5, e5).`,
+      content: `Master Coach Assessment for Current Position:
+${threatsSummary}
+
+Key Guiding Principles (From Chess Classics):
+• Centralisation (Boroljub Zlatanovic): If your opponent neglects central control, immediately improve yours!
+• Safety First (Dan Heisman LPDO): Loose Pieces Drop Off. Constantly audit which pieces are undefended.
+• Piece Harmony (Irving Chernev): Place knights and pawns on squares of the same color, and bishops on opposite colors.
+• King Safety (Fred Wilson): Guard f7/f2 diligently and castle early before attacking.`,
       isOffline: true,
     };
   }

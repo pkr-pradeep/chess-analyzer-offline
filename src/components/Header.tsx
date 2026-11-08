@@ -11,14 +11,15 @@ import {
   ChevronDown, 
   ChevronUp, 
   Sparkles,
-  Key
+  Key,
+  BookOpen
 } from 'lucide-react';
 import { chessAudio } from '../utils/chessAudio';
 import { geminiKeyService } from '../services/geminiKeyService';
 
 interface HeaderProps {
-  activeTab: 'play' | 'review' | 'puzzles' | 'plan' | 'dashboard';
-  onSelectTab: (tab: 'play' | 'review' | 'puzzles' | 'plan' | 'dashboard') => void;
+  activeTab: 'play' | 'review' | 'puzzles' | 'guide' | 'plan' | 'dashboard';
+  onSelectTab: (tab: 'play' | 'review' | 'puzzles' | 'guide' | 'plan' | 'dashboard') => void;
   isGeminiModalOpen: boolean;
   onToggleGeminiModal: () => void;
   rating: number;
@@ -70,8 +71,16 @@ export const Header: React.FC<HeaderProps> = ({
       label: 'Custom Puzzles', 
       shortLabel: 'Puzzles', 
       icon: Puzzle,
-      tagline: 'Tactics Generated from Your Mistakes',
+      tagline: 'Tactics from Classics & Games',
       shortcut: 'Tactics Gym'
+    },
+    { 
+      id: 'guide' as const, 
+      label: 'Chess Guide & Books', 
+      shortLabel: 'Guide', 
+      icon: BookOpen,
+      tagline: 'Masterclass Lessons & Literature Rules',
+      shortcut: 'Books & Rules'
     },
     { 
       id: 'plan' as const, 
